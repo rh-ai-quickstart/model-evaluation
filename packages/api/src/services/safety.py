@@ -12,6 +12,15 @@ logger = logging.getLogger(__name__)
 
 SAFETY_TIMEOUT = 30.0  # seconds -- guard models are fast
 
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=SAFETY_TIMEOUT)
+    return _client
+
 
 @dataclass
 class SafetyResult:
@@ -73,9 +82,9 @@ async def _call_guard(text: str, role: str) -> SafetyResult:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=SAFETY_TIMEOUT) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
+        client = _get_client()
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
 
         data = response.json()
         output = data["choices"][0]["message"]["content"].strip().lower()

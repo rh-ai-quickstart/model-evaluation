@@ -36,7 +36,6 @@ from ..services.generation import generate_answer
 from ..services.profiles import EvalProfile, list_profiles, load_profile
 from ..services.query_decomposition import decompose_query
 from ..services.retrieval import _apply_diversity, _deduplicate_chunks, retrieve_chunks
-from ..services.safety import check_input_safety
 from ..services.scoring import compute_chunk_alignment, score_result
 from ..services.synthesizer import generate_questions
 from ..services.truth_generation import generate_truth_from_manual_answer
@@ -76,9 +75,7 @@ class _QuestionResult:
     verdict: QuestionVerdict | None = None
 
 
-# Max questions to process concurrently. Limits pressure on the MaaS endpoint
-# while still providing significant speedup over sequential processing.
-_MAX_CONCURRENT_QUESTIONS = 3
+_MAX_CONCURRENT_QUESTIONS = 6
 
 # Keys accepted by retrieve_chunks(); profile-only merge options must be excluded.
 _RETRIEVE_CHUNKS_KWARGS = frozenset(
@@ -171,17 +168,6 @@ async def _process_question(
 
         start = time.time()
         try:
-            # Pre-generation safety check on question text
-            input_safety = await check_input_safety(question)
-            if not input_safety.is_safe:
-                logger.info(
-                    "Eval question blocked by safety filter (category=%s): %.80s",
-                    input_safety.category,
-                    question,
-                )
-                result.error = "Question blocked by safety filter"
-                return result
-
             # Build retrieval kwargs from profile settings
             retrieval_kwargs: dict = {}
             if profile and hasattr(profile, "retrieval"):
@@ -371,12 +357,16 @@ async def _process_question(
 
             # Compute chunk alignment: prefer truth refs, fall back to expected_chunks
             chunk_refs = None
+            chunk_texts = None
             if q_item.truth and q_item.truth.retrieval_truth.expected_chunk_refs:
                 chunk_refs = q_item.truth.retrieval_truth.expected_chunk_refs
+                chunk_texts = q_item.truth.retrieval_truth.expected_chunk_texts or None
             elif q_item.expected_chunks:
                 chunk_refs = q_item.expected_chunks
             if chunk_refs and chunks:
-                result.chunk_alignment_score = compute_chunk_alignment(chunks, chunk_refs)
+                result.chunk_alignment_score = compute_chunk_alignment(
+                    chunks, chunk_refs, chunk_texts
+                )
 
             # Run deterministic checks (fast, no LLM cost)
             if chunks:

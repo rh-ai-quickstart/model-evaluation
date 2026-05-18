@@ -11,7 +11,7 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
-GENERATION_TIMEOUT = 120.0  # seconds
+GENERATION_TIMEOUT = 60.0  # seconds
 
 _client: httpx.AsyncClient | None = None
 

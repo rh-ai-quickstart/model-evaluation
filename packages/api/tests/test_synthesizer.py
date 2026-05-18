@@ -44,21 +44,18 @@ def _synthesis_env(monkeypatch):
 
 
 def _patch_httpx_synthesize(questions_data):
-    """Patch httpx.AsyncClient so POST returns JSON questions from the model."""
+    """Patch synthesizer._get_client so POST returns JSON questions from the model."""
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
         "choices": [{"message": {"content": json.dumps({"questions": questions_data})}}]
     }
 
-    mock_inner = MagicMock()
-    mock_inner.post = AsyncMock(return_value=mock_response)
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.is_closed = False
 
-    mock_ac = MagicMock()
-    mock_ac.return_value.__aenter__ = AsyncMock(return_value=mock_inner)
-    mock_ac.return_value.__aexit__ = AsyncMock(return_value=None)
-
-    return patch("src.services.synthesizer.httpx.AsyncClient", mock_ac)
+    return patch("src.services.synthesizer._get_client", return_value=mock_client)
 
 
 # --- Tests ---
@@ -201,7 +198,7 @@ def test_synthesize_with_fsi_profile(client, _setup_db):
     assert response.json()["count"] == 1
     # Verify the prompt sent to the model includes FSI-specific rules
     # Use call_args_list[0] to get the synthesis call (truth generation adds subsequent calls)
-    call_kwargs = mock_httpx.return_value.__aenter__.return_value.post.call_args_list[0]
+    call_kwargs = mock_httpx.return_value.post.call_args_list[0]
     payload = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
     prompt_content = payload["messages"][0]["content"]
     assert "SEC/FINRA" in prompt_content
@@ -222,7 +219,7 @@ def test_synthesize_without_profile_uses_default_rules(client, _setup_db):
 
     assert response.status_code == 200
     # Use call_args_list[0] to get the synthesis call (truth generation adds subsequent calls)
-    call_kwargs = mock_httpx.return_value.__aenter__.return_value.post.call_args_list[0]
+    call_kwargs = mock_httpx.return_value.post.call_args_list[0]
     payload = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
     prompt_content = payload["messages"][0]["content"]
     assert "SEC/FINRA" not in prompt_content
@@ -245,7 +242,7 @@ def test_synthesize_with_invalid_profile_falls_back_to_default(client, _setup_db
     assert response.status_code == 200
     assert response.json()["count"] == 1
     # Use call_args_list[0] to get the synthesis call (truth generation adds subsequent calls)
-    call_kwargs = mock_httpx.return_value.__aenter__.return_value.post.call_args_list[0]
+    call_kwargs = mock_httpx.return_value.post.call_args_list[0]
     payload = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
     prompt_content = payload["messages"][0]["content"]
     assert "SEC/FINRA" not in prompt_content
@@ -302,16 +299,17 @@ def test_synthesize_returns_truth_when_judge_configured(client, _setup_db):
     concept_response.raise_for_status = MagicMock()
     concept_response.json.return_value = {"choices": [{"message": {"content": concepts_json}}]}
 
-    mock_inner = MagicMock()
-    mock_inner.post = AsyncMock(side_effect=[synth_response, concept_response])
+    synth_client = MagicMock()
+    synth_client.post = AsyncMock(return_value=synth_response)
+    synth_client.is_closed = False
 
-    mock_ac = MagicMock()
-    mock_ac.return_value.__aenter__ = AsyncMock(return_value=mock_inner)
-    mock_ac.return_value.__aexit__ = AsyncMock(return_value=None)
+    truth_client = MagicMock()
+    truth_client.post = AsyncMock(return_value=concept_response)
+    truth_client.is_closed = False
 
     with (
-        patch("src.services.synthesizer.httpx.AsyncClient", mock_ac),
-        patch("src.services.truth_generation.httpx.AsyncClient", mock_ac),
+        patch("src.services.synthesizer._get_client", return_value=synth_client),
+        patch("src.services.truth_generation._get_client", return_value=truth_client),
         patch(
             "src.services.truth_generation.retrieve_chunks",
             new_callable=AsyncMock,

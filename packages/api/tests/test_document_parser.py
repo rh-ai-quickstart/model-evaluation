@@ -70,8 +70,10 @@ def test_docling_unavailable_when_not_installed():
 
 
 def test_pypdf_parser_returns_chunks():
-    """Should extract text and produce chunks via pypdf fallback."""
-    # Create a real PDF, then mock the PdfReader to return known text
+    """Should extract text and produce chunks via pypdf fallback.
+
+    Pages are merged before chunking, so short texts produce a single chunk.
+    """
     with patch("src.services.document_parser.PdfReader") as mock_reader_cls:
         mock_page1 = MagicMock()
         mock_page1.extract_text.return_value = "Revenue was $1 billion in Q4 2024."
@@ -86,11 +88,10 @@ def test_pypdf_parser_returns_chunks():
 
     assert result.parser_used == "pypdf"
     assert result.page_count == 2
-    assert len(result.chunks) == 2
+    assert len(result.chunks) >= 1
     assert result.chunks[0].source_document == "report.pdf"
-    assert result.chunks[0].page_number == "1"
     assert "Revenue" in result.chunks[0].text
-    assert result.chunks[1].page_number == "2"
+    assert "Operating expenses" in result.chunks[0].text
 
 
 def test_pypdf_parser_skips_empty_pages():

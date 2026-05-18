@@ -159,10 +159,9 @@ def test_extract_answer_truth_returns_concepts():
     mock_resp = _make_mock_response(concepts_json)
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_resp
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
-    with patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client):
+    with patch("src.services.truth_generation._get_client", return_value=mock_client):
         result = asyncio.run(extract_answer_truth("ETFs must file Form N-1A...", "test-judge"))
 
     assert isinstance(result, AnswerTruth)
@@ -180,11 +179,10 @@ def test_extract_answer_truth_raises_on_empty_concepts():
     mock_resp = _make_mock_response("[]")
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_resp
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
     with (
-        patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client),
+        patch("src.services.truth_generation._get_client", return_value=mock_client),
         pytest.raises(RuntimeError, match="empty or non-list"),
     ):
         asyncio.run(extract_answer_truth("Some answer", "test-judge"))
@@ -206,11 +204,10 @@ def test_extract_answer_truth_raises_on_api_error():
 
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_response
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
     with (
-        patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client),
+        patch("src.services.truth_generation._get_client", return_value=mock_client),
         pytest.raises(RuntimeError, match="HTTP 500"),
     ):
         asyncio.run(extract_answer_truth("Some answer", "test-judge"))
@@ -374,13 +371,12 @@ def test_generate_truth_from_synthesis():
     mock_resp = _make_mock_response(concepts_json)
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_resp
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
     classification = {"required": ["guide.pdf"], "supporting": []}
 
     with (
-        patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client),
+        patch("src.services.truth_generation._get_client", return_value=mock_client),
         patch(
             "src.services.truth_generation.classify_documents",
             new_callable=AsyncMock,
@@ -412,8 +408,7 @@ def test_generate_truth_from_synthesis_can_ground_via_retrieval():
     mock_resp = _make_mock_response(concepts_json)
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_resp
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
     retrieved_chunks = [
         {
@@ -427,7 +422,7 @@ def test_generate_truth_from_synthesis_can_ground_via_retrieval():
     mock_session = AsyncMock()
 
     with (
-        patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client),
+        patch("src.services.truth_generation._get_client", return_value=mock_client),
         patch(
             "src.services.truth_generation.retrieve_chunks",
             new_callable=AsyncMock,
@@ -468,14 +463,13 @@ def test_generate_truth_from_manual_answer():
     mock_resp = _make_mock_response(concepts_json)
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_resp
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.is_closed = False
 
     classification = {"required": ["guide.pdf"], "supporting": []}
     mock_session = AsyncMock()
 
     with (
-        patch("src.services.truth_generation.httpx.AsyncClient", return_value=mock_client),
+        patch("src.services.truth_generation._get_client", return_value=mock_client),
         patch(
             "src.services.truth_generation.retrieve_chunks",
             new_callable=AsyncMock,

@@ -9,9 +9,10 @@ Provides two chunking strategies:
 
 import re
 
-# Keep aligned with embedding model context (e.g. Nomic 512 tokens); dense text can be >2 tok/word.
-CHUNK_SIZE = 150
-CHUNK_OVERLAP = 20  # proportional to former 40/300 overlap ratio
+# nomic-embed-text-v1.5 supports up to 8192 tokens (~3000 words).
+# 400 words ≈ 600 tokens: large enough to capture full regulatory paragraphs.
+CHUNK_SIZE = 400
+CHUNK_OVERLAP = 80
 
 # Average body line length threshold: lines significantly shorter are likely headings.
 _HEADING_MAX_WORDS = 12
@@ -166,6 +167,8 @@ def section_chunk_text(
         sub_chunks = chunk_text(body_text, source_document, page_number, chunk_size, chunk_overlap)
         for chunk in sub_chunks:
             chunk["section_path"] = heading
+            if heading:
+                chunk["text"] = f"{heading}\n{chunk['text']}"
         result.extend(sub_chunks)
 
     return (

@@ -140,30 +140,30 @@ def _parse_with_pypdf(
         ParseResult with text-based chunks.
     """
     reader = PdfReader(io.BytesIO(content))
-    pages: list[dict] = []
-    for i, page in enumerate(reader.pages, start=1):
+    page_texts: list[str] = []
+    for page in reader.pages:
         text = page.extract_text() or ""
         if text.strip():
-            pages.append({"page_number": i, "text": text.strip()})
+            page_texts.append(text.strip())
+
+    full_text = "\n\n".join(page_texts)
+    raw_chunks = section_chunk_text(
+        text=full_text,
+        source_document=source_document,
+        chunk_size=chunk_size,
+    )
 
     all_chunks: list[ChunkData] = []
-    for page in pages:
-        raw_chunks = section_chunk_text(
-            text=page["text"],
-            source_document=source_document,
-            page_number=str(page["page_number"]),
-            chunk_size=chunk_size,
-        )
-        for rc in raw_chunks:
-            all_chunks.append(
-                ChunkData(
-                    text=rc["text"],
-                    source_document=rc["source_document"],
-                    page_number=rc["page_number"],
-                    section_path=rc.get("section_path"),
-                    token_count=rc["token_count"],
-                )
+    for rc in raw_chunks:
+        all_chunks.append(
+            ChunkData(
+                text=rc["text"],
+                source_document=rc["source_document"],
+                page_number=rc["page_number"],
+                section_path=rc.get("section_path"),
+                token_count=rc["token_count"],
             )
+        )
 
     return ParseResult(
         chunks=all_chunks,

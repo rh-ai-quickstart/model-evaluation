@@ -18,7 +18,7 @@ from ..schemas.documents import (
     DocumentUploadResponse,
 )
 from ..services.document_parser import parse_pdf
-from ..services.embedding import generate_embeddings
+from ..services.embedding import DOCUMENT_PREFIX, generate_embeddings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -53,7 +53,7 @@ async def _generate_embeddings_for_document(document_id: int) -> None:
                 return
 
             texts = [c.text for c in chunks]
-            embed_out = await generate_embeddings(texts)
+            embed_out = await generate_embeddings(texts, prefix=DOCUMENT_PREFIX)
             embeddings = embed_out.vectors
 
             if not embeddings:

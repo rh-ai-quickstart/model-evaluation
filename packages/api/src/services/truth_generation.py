@@ -23,6 +23,15 @@ from .retrieval import retrieve_chunks
 
 logger = logging.getLogger(__name__)
 
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=COVERAGE_TIMEOUT)
+    return _client
+
 _classification_cache: dict[str, dict[str, list[str]]] = {}
 _CLASSIFICATION_CACHE_MAX = 200
 
@@ -140,9 +149,9 @@ async def classify_documents(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=COVERAGE_TIMEOUT) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
+        client = _get_client()
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
 
         data = response.json()
         content = data["choices"][0]["message"]["content"].strip()
@@ -223,9 +232,9 @@ async def extract_answer_truth(expected_answer: str, model_name: str) -> AnswerT
     }
 
     try:
-        async with httpx.AsyncClient(timeout=COVERAGE_TIMEOUT) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
+        client = _get_client()
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
 
         data = response.json()
         content = data["choices"][0]["message"]["content"].strip()
@@ -278,10 +287,12 @@ async def build_retrieval_truth_from_synthesis(
     required_docs = set(classification["required"])
     supporting_docs = set(classification["supporting"])
 
-    required_refs = [
-        f"chunk:{c['id']}" for c in source_chunks
+    required_chunks = [
+        c for c in source_chunks
         if c.get("id") and c.get("source_document", "") in required_docs
     ]
+    required_refs = [f"chunk:{c['id']}" for c in required_chunks]
+    required_texts = [c.get("text", "") for c in required_chunks]
     supporting_refs = [
         f"chunk:{c['id']}" for c in source_chunks
         if c.get("id") and c.get("source_document", "") in supporting_docs
@@ -290,6 +301,7 @@ async def build_retrieval_truth_from_synthesis(
     return RetrievalTruth(
         required_documents=sorted(required_docs),
         expected_chunk_refs=required_refs,
+        expected_chunk_texts=required_texts,
         supporting_documents=sorted(supporting_docs),
         supporting_chunk_refs=supporting_refs,
         evidence_mode="traced_from_synthesis",
@@ -355,10 +367,12 @@ async def ground_answer_to_corpus(
     required_docs = set(classification["required"])
     supporting_docs = set(classification["supporting"])
 
-    required_refs = [
-        f"chunk:{c['id']}" for c in aligned
+    required_chunks = [
+        c for c in aligned
         if c.get("id") and c.get("source_document", "") in required_docs
     ]
+    required_refs = [f"chunk:{c['id']}" for c in required_chunks]
+    required_texts = [c.get("text", "") for c in required_chunks]
     supporting_refs = [
         f"chunk:{c['id']}" for c in aligned
         if c.get("id") and c.get("source_document", "") in supporting_docs
@@ -377,6 +391,7 @@ async def ground_answer_to_corpus(
     return RetrievalTruth(
         required_documents=sorted(required_docs),
         expected_chunk_refs=required_refs,
+        expected_chunk_texts=required_texts,
         supporting_documents=sorted(supporting_docs),
         supporting_chunk_refs=supporting_refs,
         evidence_mode=evidence_mode,
