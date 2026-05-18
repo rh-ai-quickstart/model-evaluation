@@ -121,21 +121,60 @@ def _build_generation_payload(
     return payload, len(prompt_chunks), max_tokens
 
 
+_REASONING_START = re.compile(
+    r"^(okay|ok|alright|so|well|hmm|let me|i need to|i('ll| will) )"
+    r".*\b(figure out|think|analyze|go through|work through|reason|consider)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_TRANSITION_LINE = re.compile(
+    r"^("
+    r"based on (?:the |all |these )?(?:above|provided|context|sources|analysis|information)"
+    r"|in (?:summary|conclusion)"
+    r"|to (?:summarize|conclude|answer)"
+    r"|here(?:'s| is| are) "
+    r"|therefore|overall|thus"
+    r"|so,? (?:the |in |to )"
+    r"|putting (?:it|this|everything) (?:all )?together"
+    r")",
+    re.IGNORECASE,
+)
+
+_ANSWER_BODY = re.compile(
+    r"\n\s*\n(?=(?:1|I)[\.\)]\s+\*?\*?[A-Z]|\*\*1)",
+    re.IGNORECASE,
+)
+
+_TRAILING_REASONING = re.compile(
+    r"\n\s*\n\s*"
+    r"(?:I should |I need to |I('ll| will) |Let me |Now,? I |"
+    r"I think I should |I want to make sure |I have to )"
+    r"[^\n]*$",
+    re.IGNORECASE,
+)
+
+
 def _strip_reasoning_blocks(answer: str) -> str:
     """Remove model-visible reasoning blocks from final answers.
 
-    Strips paired short/long ``think`` / ``redacted_thinking`` blocks and
-    drops any text before the last orphan closing tag so automated metrics
-    score only the answer body.
+    Handles three forms of chain-of-thought output:
+
+    1. Tagged blocks: ``<think>...</think>`` or ``<redacted_thinking>``
+    2. Orphan closing tags: ``</think>`` without opener (DeepSeek-R1 via vLLM)
+    3. Untagged reasoning: plain-text chain-of-thought from distill models
+       (e.g. deepseek-r1-distill-qwen) that starts with informal reasoning
+       language and transitions to a structured answer
     """
     text = (answer or "").strip()
 
+    # 1. Strip paired reasoning tags
     for pattern in (
         r"<think\b[^>]*>.*?</think>\s*",
         r"<redacted_thinking\b[^>]*>.*?</redacted_thinking>\s*",
     ):
         text = re.sub(pattern, "", text, flags=re.DOTALL | re.IGNORECASE)
 
+    # 2. Handle orphan closing tags (drop everything before)
     lower = text.lower()
     for closing in ("</think>", "</redacted_thinking>"):
         if closing in lower:
@@ -143,7 +182,28 @@ def _strip_reasoning_blocks(answer: str) -> str:
             text = text[end:]
             lower = text.lower()
 
-    return text.strip()
+    text = text.strip()
+
+    # 3. Strip untagged chain-of-thought from distill models
+    if _REASONING_START.match(text):
+        body_match = _ANSWER_BODY.search(text)
+        if body_match:
+            candidate = text[body_match.end():].strip()
+            if len(candidate) >= 80:
+                text = candidate
+        else:
+            paragraphs = re.split(r"\n\s*\n", text)
+            for i, para in enumerate(paragraphs):
+                if _TRANSITION_LINE.match(para.strip()):
+                    rest = "\n\n".join(paragraphs[i + 1 :]).strip()
+                    if len(rest) >= 80:
+                        text = rest
+                        break
+
+    # 4. Strip trailing reasoning fragments
+    text = _TRAILING_REASONING.sub("", text).strip()
+
+    return text
 
 
 async def generate_answer(
@@ -209,8 +269,12 @@ async def generate_answer(
             response.raise_for_status()
 
             data = response.json()
-            answer = data["choices"][0]["message"]["content"]
-            answer = _strip_reasoning_blocks(answer)
+            message = data["choices"][0]["message"]
+            answer = message["content"]
+            if message.get("reasoning_content") or message.get("reasoning"):
+                logger.debug("Reasoning field present; content already separated")
+            else:
+                answer = _strip_reasoning_blocks(answer)
             usage = data.get("usage")
 
             return {

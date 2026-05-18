@@ -1,6 +1,7 @@
 # This project was developed with assistance from AI tools.
-"""Tests for DeepEval scoring service."""
+"""Tests for consolidated judge scoring service."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,7 +25,32 @@ def _mock_settings():
         mock_settings.MODEL_A_NAME = ""
         mock_settings.MODEL_B_NAME = ""
         mock_settings.resolved_judge_model_name = "granite-3.1-8b-instruct"
+        mock_settings.api_token_bare = "test-token"
         yield mock_settings
+
+
+def _make_prompt_a_response(
+    faithfulness=0.85, relevancy=0.90, context_relevancy=0.75, abstention_quality=0.95
+):
+    """Build a valid Prompt A JSON response."""
+    return json.dumps({
+        "faithfulness": faithfulness,
+        "relevancy": relevancy,
+        "context_relevancy": context_relevancy,
+        "abstention_quality": abstention_quality,
+    })
+
+
+def _make_prompt_b_response(
+    completeness=0.80, correctness=0.90, compliance_accuracy=0.85, context_precision=0.75
+):
+    """Build a valid Prompt B JSON response."""
+    return json.dumps({
+        "completeness": completeness,
+        "correctness": correctness,
+        "compliance_accuracy": compliance_accuracy,
+        "context_precision": context_precision,
+    })
 
 
 @pytest.mark.asyncio
@@ -64,10 +90,6 @@ async def test_score_result_uses_evaluated_model_when_no_env_judge():
     """Should use evaluated_model_name as judge when env judge chain is empty."""
     from src.services.scoring import score_result
 
-    mock_metric = MagicMock()
-    mock_metric.score = 0.8
-    mock_metric.a_measure = AsyncMock()
-
     with patch("src.services.scoring.settings") as mock_settings:
         mock_settings.API_TOKEN = "test-token"
         mock_settings.MAAS_ENDPOINT = "https://maas.example.com"
@@ -77,13 +99,11 @@ async def test_score_result_uses_evaluated_model_when_no_env_judge():
         mock_settings.resolved_judge_model_name = ""
         mock_settings.api_token_bare = "test-token"
 
-        with (
-            patch("src.services.scoring.FaithfulnessMetric", return_value=mock_metric),
-            patch("src.services.scoring.AnswerRelevancyMetric", return_value=mock_metric),
-            patch("src.services.scoring.ContextualRelevancyMetric", return_value=mock_metric),
-            patch("src.services.scoring._abstention_metric", return_value=mock_metric),
-            patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls,
-        ):
+        with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+            mock_judge = MagicMock()
+            mock_judge.a_generate = AsyncMock(return_value=_make_prompt_a_response())
+            mock_judge_cls.return_value = mock_judge
+
             result = await score_result(
                 question="What is AI?",
                 answer="AI is artificial intelligence.",
@@ -93,28 +113,26 @@ async def test_score_result_uses_evaluated_model_when_no_env_judge():
 
     mock_judge_cls.assert_called_once()
     assert mock_judge_cls.call_args.kwargs["model_name"] == "qwen3-14b"
-    assert result.get("relevancy_score") == 0.8
+    assert result.get("relevancy_score") == 0.9
 
 
 @pytest.mark.asyncio
 async def test_score_result_returns_all_metrics(_mock_settings):
-    """Should return all metric scores when scoring succeeds with expected_answer."""
+    """Should return all 8 metric scores when expected_answer is provided."""
     from src.services.scoring import score_result
 
-    mock_metric = MagicMock()
-    mock_metric.score = 0.85
-    mock_metric.a_measure = AsyncMock()
+    prompt_a_resp = _make_prompt_a_response(
+        faithfulness=0.85, relevancy=0.90, context_relevancy=0.75, abstention_quality=0.95
+    )
+    prompt_b_resp = _make_prompt_b_response(
+        completeness=0.80, correctness=0.88, compliance_accuracy=0.82, context_precision=0.70
+    )
 
-    with (
-        patch("src.services.scoring.FaithfulnessMetric", return_value=mock_metric),
-        patch("src.services.scoring.AnswerRelevancyMetric", return_value=mock_metric),
-        patch("src.services.scoring.ContextualPrecisionMetric", return_value=mock_metric),
-        patch("src.services.scoring.ContextualRelevancyMetric", return_value=mock_metric),
-        patch("src.services.scoring._abstention_metric", return_value=mock_metric),
-        patch("src.services.scoring._completeness_metric", return_value=mock_metric),
-        patch("src.services.scoring._correctness_metric", return_value=mock_metric),
-        patch("src.services.scoring._compliance_accuracy_metric", return_value=mock_metric),
-    ):
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(side_effect=[prompt_a_resp, prompt_b_resp])
+        mock_judge_cls.return_value = mock_judge
+
         result = await score_result(
             question="What is AI?",
             answer="AI is artificial intelligence.",
@@ -123,13 +141,13 @@ async def test_score_result_returns_all_metrics(_mock_settings):
         )
 
     assert result["groundedness_score"] == 0.85
-    assert result["relevancy_score"] == 0.85
-    assert result["context_precision_score"] == 0.85
-    assert result["context_relevancy_score"] == 0.85
-    assert result["abstention_score"] == 0.85
-    assert result["completeness_score"] == 0.85
-    assert result["correctness_score"] == 0.85
-    assert result["compliance_accuracy_score"] == 0.85
+    assert result["relevancy_score"] == 0.90
+    assert result["context_relevancy_score"] == 0.75
+    assert result["abstention_score"] == 0.95
+    assert result["completeness_score"] == 0.80
+    assert result["correctness_score"] == 0.88
+    assert result["compliance_accuracy_score"] == 0.82
+    assert result["context_precision_score"] == 0.70
     assert result["is_hallucination"] is False
 
 
@@ -138,20 +156,15 @@ async def test_score_result_detects_hallucination(_mock_settings):
     """Should flag hallucination when groundedness score is below threshold."""
     from src.services.scoring import score_result
 
-    low_score_metric = MagicMock()
-    low_score_metric.score = 0.4
-    low_score_metric.a_measure = AsyncMock()
+    prompt_a_resp = _make_prompt_a_response(
+        faithfulness=0.4, relevancy=0.90, context_relevancy=0.75, abstention_quality=0.95
+    )
 
-    high_score_metric = MagicMock()
-    high_score_metric.score = 0.9
-    high_score_metric.a_measure = AsyncMock()
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(return_value=prompt_a_resp)
+        mock_judge_cls.return_value = mock_judge
 
-    with (
-        patch("src.services.scoring.FaithfulnessMetric", return_value=low_score_metric),
-        patch("src.services.scoring.AnswerRelevancyMetric", return_value=high_score_metric),
-        patch("src.services.scoring.ContextualRelevancyMetric", return_value=high_score_metric),
-        patch("src.services.scoring._abstention_metric", return_value=high_score_metric),
-    ):
         result = await score_result(
             question="What is the capital requirement?",
             answer="Banks need 50% capital reserves.",
@@ -163,27 +176,51 @@ async def test_score_result_detects_hallucination(_mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_score_result_handles_metric_failure(_mock_settings):
-    """Should return None for a metric that fails and continue with others."""
+async def test_score_result_handles_prompt_a_failure(_mock_settings):
+    """Should return None scores when Prompt A judge call fails."""
     from src.services.scoring import score_result
 
-    failing_metric = MagicMock()
-    failing_metric.a_measure = AsyncMock(side_effect=RuntimeError("Judge model unavailable"))
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(
+            side_effect=RuntimeError("Judge model unavailable")
+        )
+        mock_judge_cls.return_value = mock_judge
 
-    ok_metric = MagicMock()
-    ok_metric.score = 0.9
-    ok_metric.a_measure = AsyncMock()
+        result = await score_result(
+            question="What is AI?",
+            answer="AI is artificial intelligence.",
+            contexts=["AI stands for artificial intelligence."],
+        )
 
-    with (
-        patch("src.services.scoring.FaithfulnessMetric", return_value=failing_metric),
-        patch("src.services.scoring.AnswerRelevancyMetric", return_value=ok_metric),
-        patch("src.services.scoring.ContextualPrecisionMetric", return_value=ok_metric),
-        patch("src.services.scoring.ContextualRelevancyMetric", return_value=ok_metric),
-        patch("src.services.scoring._abstention_metric", return_value=ok_metric),
-        patch("src.services.scoring._completeness_metric", return_value=ok_metric),
-        patch("src.services.scoring._correctness_metric", return_value=ok_metric),
-        patch("src.services.scoring._compliance_accuracy_metric", return_value=ok_metric),
-    ):
+    assert result["groundedness_score"] is None
+    assert result["relevancy_score"] is None
+    assert result["context_relevancy_score"] is None
+    assert result["abstention_score"] is None
+    assert result["is_hallucination"] is None
+
+
+@pytest.mark.asyncio
+async def test_score_result_handles_prompt_b_failure_keeps_prompt_a(_mock_settings):
+    """Should keep Prompt A scores even when Prompt B fails."""
+    from src.services.scoring import score_result
+
+    prompt_a_resp = _make_prompt_a_response()
+
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        call_count = 0
+
+        async def side_effect(prompt):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return prompt_a_resp
+            raise RuntimeError("Prompt B failed")
+
+        mock_judge.a_generate = AsyncMock(side_effect=side_effect)
+        mock_judge_cls.return_value = mock_judge
+
         result = await score_result(
             question="What is AI?",
             answer="AI is artificial intelligence.",
@@ -191,30 +228,25 @@ async def test_score_result_handles_metric_failure(_mock_settings):
             expected_answer="AI is artificial intelligence.",
         )
 
-    assert result["groundedness_score"] is None
-    assert result["relevancy_score"] == 0.9
-    assert result["context_precision_score"] == 0.9
-    assert result["context_relevancy_score"] == 0.9
-    assert result["abstention_score"] == 0.9
-    assert result["completeness_score"] == 0.9
-    assert result["is_hallucination"] is None
+    assert result["groundedness_score"] == 0.85
+    assert result["relevancy_score"] == 0.90
+    assert result["completeness_score"] is None
+    assert result["correctness_score"] is None
+    assert result["is_hallucination"] is False
 
 
 @pytest.mark.asyncio
 async def test_score_result_without_expected_answer(_mock_settings):
-    """Should omit context_precision_score when no expected_answer is provided."""
+    """Should omit Prompt B metrics when no expected_answer is provided."""
     from src.services.scoring import score_result
 
-    mock_metric = MagicMock()
-    mock_metric.score = 0.85
-    mock_metric.a_measure = AsyncMock()
+    prompt_a_resp = _make_prompt_a_response()
 
-    with (
-        patch("src.services.scoring.FaithfulnessMetric", return_value=mock_metric),
-        patch("src.services.scoring.AnswerRelevancyMetric", return_value=mock_metric),
-        patch("src.services.scoring.ContextualRelevancyMetric", return_value=mock_metric),
-        patch("src.services.scoring._abstention_metric", return_value=mock_metric),
-    ):
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(return_value=prompt_a_resp)
+        mock_judge_cls.return_value = mock_judge
+
         result = await score_result(
             question="What is AI?",
             answer="AI is artificial intelligence.",
@@ -230,6 +262,31 @@ async def test_score_result_without_expected_answer(_mock_settings):
     assert "correctness_score" not in result
     assert "compliance_accuracy_score" not in result
     assert result["is_hallucination"] is False
+    # Only 1 judge call (Prompt A), not 2
+    assert mock_judge.a_generate.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_score_result_makes_two_concurrent_calls_with_expected_answer(_mock_settings):
+    """Should make exactly 2 judge calls (Prompt A + B) when expected_answer is provided."""
+    from src.services.scoring import score_result
+
+    prompt_a_resp = _make_prompt_a_response()
+    prompt_b_resp = _make_prompt_b_response()
+
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(side_effect=[prompt_a_resp, prompt_b_resp])
+        mock_judge_cls.return_value = mock_judge
+
+        await score_result(
+            question="What is AI?",
+            answer="AI is artificial intelligence.",
+            contexts=["AI stands for artificial intelligence."],
+            expected_answer="AI is artificial intelligence.",
+        )
+
+    assert mock_judge.a_generate.call_count == 2
 
 
 def test_maas_judge_model_get_model_name():
@@ -242,6 +299,67 @@ def test_maas_judge_model_get_model_name():
         api_key="test-token",
     )
     assert judge.get_model_name() == "granite-3.1-8b-instruct"
+
+
+# --- Parse scores tests ---
+
+
+def test_parse_scores_valid_json():
+    """Should parse well-formed JSON scores correctly."""
+    from src.services.scoring import _parse_scores
+
+    raw = '{"faithfulness": 0.85, "relevancy": 0.90, "context_relevancy": 0.75}'
+    result = _parse_scores(raw, ["faithfulness", "relevancy", "context_relevancy"])
+    assert result == {"faithfulness": 0.85, "relevancy": 0.90, "context_relevancy": 0.75}
+
+
+def test_parse_scores_with_markdown_fencing():
+    """Should strip markdown code fences before parsing."""
+    from src.services.scoring import _parse_scores
+
+    raw = '```json\n{"faithfulness": 0.85, "relevancy": 0.90}\n```'
+    result = _parse_scores(raw, ["faithfulness", "relevancy"])
+    assert result == {"faithfulness": 0.85, "relevancy": 0.90}
+
+
+def test_parse_scores_regex_fallback():
+    """Should fall back to regex extraction when JSON parse fails."""
+    from src.services.scoring import _parse_scores
+
+    raw = 'Here are the scores: "faithfulness": 0.85, "relevancy": 0.90, extra text'
+    result = _parse_scores(raw, ["faithfulness", "relevancy"])
+    assert result["faithfulness"] == 0.85
+    assert result["relevancy"] == 0.90
+
+
+def test_parse_scores_missing_key_returns_none():
+    """Should return None for keys not present in the response."""
+    from src.services.scoring import _parse_scores
+
+    raw = '{"faithfulness": 0.85}'
+    result = _parse_scores(raw, ["faithfulness", "relevancy"])
+    assert result["faithfulness"] == 0.85
+    assert result["relevancy"] is None
+
+
+def test_parse_scores_clamps_out_of_range():
+    """Should clamp scores to [0.0, 1.0]."""
+    from src.services.scoring import _parse_scores
+
+    raw = '{"faithfulness": 1.5, "relevancy": -0.3}'
+    result = _parse_scores(raw, ["faithfulness", "relevancy"])
+    assert result["faithfulness"] == 1.0
+    assert result["relevancy"] == 0.0
+
+
+def test_parse_scores_handles_null():
+    """Should return None for null values in JSON."""
+    from src.services.scoring import _parse_scores
+
+    raw = '{"faithfulness": null, "relevancy": 0.85}'
+    result = _parse_scores(raw, ["faithfulness", "relevancy"])
+    assert result["faithfulness"] is None
+    assert result["relevancy"] == 0.85
 
 
 # --- Chunk alignment tests ---
