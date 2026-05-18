@@ -1,29 +1,24 @@
 # This project was developed with assistance from AI tools.
-"""DeepEval-based scoring for evaluation results.
+"""Consolidated LLM-as-judge scoring for evaluation results.
 
-Uses LLM-as-judge via DeepEval metrics to score RAG responses on
-faithfulness (groundedness), answer relevancy, contextual precision,
-contextual relevancy, completeness, correctness, compliance accuracy,
-and abstention quality. The judge model is configurable — defaults
-to MaaS endpoint.
+Scores RAG responses on faithfulness (groundedness), answer relevancy,
+contextual precision, contextual relevancy, completeness, correctness,
+compliance accuracy, and abstention quality using two consolidated judge
+prompts instead of 8 separate calls.
 
-All metrics use threshold=0.0 (raw scorer only). Pass/fail semantics
-live exclusively in the verdict layer (verdicts.py) using profile
-thresholds.
+Prompt A (always runs): faithfulness, relevancy, context_relevancy, abstention.
+Prompt B (when expected_answer provided): completeness, correctness,
+compliance_accuracy, context_precision.
+
+All scores are 0.0-1.0 raw values. Pass/fail semantics live exclusively
+in the verdict layer (verdicts.py) using profile thresholds.
 """
 
 import asyncio
+import json
 import logging
+import re
 
-from deepeval.metrics import (
-    AnswerRelevancyMetric,
-    ContextualPrecisionMetric,
-    ContextualRelevancyMetric,
-    FaithfulnessMetric,
-    GEval,
-)
-from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from openai import AsyncOpenAI, OpenAI
 
 from ..core.config import settings
@@ -32,9 +27,11 @@ logger = logging.getLogger(__name__)
 
 HALLUCINATION_THRESHOLD = 0.7
 
+_SCORE_PATTERN = re.compile(r'"(\w+)":\s*([\d.]+|null)', re.IGNORECASE)
+
 
 def _judge_model_name_for_run(evaluated_model_name: str) -> str:
-    """Which model DeepEval calls for LLM-as-judge.
+    """Which model to use as LLM-as-judge.
 
     Resolution order: JUDGE_MODEL_NAME, MODEL_A_NAME, MODEL_B_NAME,
     then falls back to evaluated_model_name. Returns empty string if
@@ -54,8 +51,8 @@ def _judge_model_name_for_run(evaluated_model_name: str) -> str:
     return name
 
 
-class MaaSJudgeModel(DeepEvalBaseLLM):
-    """OpenAI-compatible judge model for DeepEval, backed by MaaS endpoint."""
+class MaaSJudgeModel:
+    """OpenAI-compatible judge model backed by MaaS endpoint."""
 
     def __init__(
         self,
@@ -81,10 +78,6 @@ class MaaSJudgeModel(DeepEvalBaseLLM):
             timeout=120.0,
             max_retries=2,
         )
-        super().__init__(model=model_name)
-
-    def load_model(self):
-        return self._sync_client
 
     def generate(self, prompt: str) -> str:
         response = self._sync_client.chat.completions.create(
@@ -106,7 +99,7 @@ class MaaSJudgeModel(DeepEvalBaseLLM):
         return self._model_name
 
 
-def _get_judge_model(model_name: str) -> DeepEvalBaseLLM:
+def _get_judge_model(model_name: str) -> MaaSJudgeModel:
     """Create judge model for the given resolved judge / evaluated model name."""
     logger.info("Creating judge model: %s at %s", model_name, settings.MAAS_ENDPOINT)
     return MaaSJudgeModel(
@@ -116,110 +109,208 @@ def _get_judge_model(model_name: str) -> DeepEvalBaseLLM:
     )
 
 
-def _completeness_metric(judge: DeepEvalBaseLLM) -> GEval:
-    """GEval metric: did the answer cover all key points from the expected answer?"""
-    return GEval(
-        name="Completeness",
-        criteria=(
-            "Evaluate whether the actual output covers all the key points, requirements, "
-            "and information present in the expected output. Penalize omissions of important "
-            "details, conditions, or qualifications."
-        ),
-        evaluation_steps=[
-            "Identify all key points and requirements in the expected output.",
-            "Check which of those key points appear in the actual output.",
-            "Penalize for each missing key point proportional to its importance.",
-            "A score of 1.0 means all key points are covered; 0.0 means none are.",
-        ],
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
-        model=judge,
-        threshold=0.0,
-        async_mode=True,
+# ---------------------------------------------------------------------------
+# Consolidated judge prompts
+# ---------------------------------------------------------------------------
+
+_PROMPT_A = """\
+You are an expert evaluation judge for RAG (Retrieval-Augmented Generation) systems. \
+Evaluate the following response across four criteria. Score each from 0.0 to 1.0.
+
+QUESTION:
+{question}
+
+ANSWER:
+{answer}
+
+RETRIEVAL CONTEXT:
+{contexts}
+
+Evaluate these four metrics:
+
+1. **faithfulness** (groundedness): Is the answer factually supported by the \
+retrieval context? Penalize claims not grounded in the provided context. \
+1.0 = fully grounded; 0.0 = entirely fabricated.
+
+2. **relevancy** (answer relevancy): Does the answer directly address the \
+question asked? Penalize irrelevant information and tangents. \
+1.0 = perfectly relevant; 0.0 = completely off-topic.
+
+3. **context_relevancy**: Are the retrieved context chunks relevant to the \
+question? Penalize irrelevant or noisy context that does not help answer \
+the question. 1.0 = all context is relevant; 0.0 = none is relevant.
+
+4. **abstention_quality**: Does the answer appropriately handle uncertainty? \
+When the retrieval context does not contain sufficient information, the answer \
+should acknowledge the limitation rather than fabricating or guessing. \
+When context is sufficient, the answer should use it appropriately. \
+Penalize confident assertions not supported by context. \
+1.0 = appropriate handling; 0.0 = confidently wrong or inappropriately uncertain.
+
+Respond with ONLY a JSON object containing the four scores. No other text.
+Example: {{"faithfulness": 0.85, "relevancy": 0.90, "context_relevancy": 0.75, \
+"abstention_quality": 0.95}}"""
+
+_PROMPT_B = """\
+You are an expert evaluation judge for RAG (Retrieval-Augmented Generation) systems. \
+Evaluate the following response against the expected answer across four criteria. \
+Score each from 0.0 to 1.0.
+
+QUESTION:
+{question}
+
+ANSWER:
+{answer}
+
+EXPECTED ANSWER:
+{expected_answer}
+
+RETRIEVAL CONTEXT:
+{contexts}
+
+Evaluate these four metrics:
+
+1. **completeness**: Does the answer cover all key points, requirements, and \
+information present in the expected answer? Penalize omissions of important \
+details, conditions, or qualifications. \
+1.0 = all key points covered; 0.0 = none covered.
+
+2. **correctness**: Are the claims and facts in the answer consistent with \
+the expected answer? Penalize statements that contradict, misstate, or distort \
+information from the expected answer. \
+1.0 = fully correct; 0.0 = entirely incorrect.
+
+3. **compliance_accuracy**: Does the answer correctly handle domain-specific \
+compliance items (obligations, restrictions, approvals, disclosures, thresholds, \
+escalation conditions, evidence requirements, cited authorities)? Check that \
+claims are supported by the retrieval context and that critical requirements \
+from the expected answer are not omitted. \
+1.0 = full compliance accuracy; 0.0 = none.
+
+4. **context_precision**: Are the most relevant context chunks ranked higher? \
+Given the expected answer, check whether the context chunks that actually \
+contain the needed information appear before irrelevant ones. \
+1.0 = perfectly ranked; 0.0 = relevant chunks buried or absent.
+
+Respond with ONLY a JSON object containing the four scores. No other text.
+Example: {{"completeness": 0.80, "correctness": 0.90, "compliance_accuracy": 0.85, \
+"context_precision": 0.75}}"""
+
+
+def _parse_scores(raw: str, expected_keys: list[str]) -> dict[str, float | None]:
+    """Parse JSON scores from judge response with fallback regex extraction."""
+    text = raw.strip()
+
+    # Strip markdown fencing
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return {
+                k: _clamp_score(parsed.get(k))
+                for k in expected_keys
+            }
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback: regex extraction
+    scores: dict[str, float | None] = {}
+    for match in _SCORE_PATTERN.finditer(text):
+        key = match.group(1).lower()
+        val = match.group(2)
+        if val.lower() == "null":
+            scores[key] = None
+        else:
+            try:
+                scores[key] = _clamp_score(float(val))
+            except ValueError:
+                scores[key] = None
+
+    return {k: scores.get(k) for k in expected_keys}
+
+
+def _clamp_score(value) -> float | None:
+    """Clamp a score to [0.0, 1.0] or return None for invalid values."""
+    if value is None:
+        return None
+    try:
+        f = float(value)
+        return max(0.0, min(1.0, f))
+    except (TypeError, ValueError):
+        return None
+
+
+async def _run_prompt_a(
+    judge: MaaSJudgeModel,
+    question: str,
+    answer: str,
+    contexts: list[str],
+) -> dict[str, float | None]:
+    """Run consolidated Prompt A: faithfulness, relevancy, context_relevancy, abstention."""
+    contexts_str = "\n---\n".join(contexts) if contexts else "(no context provided)"
+    prompt = _PROMPT_A.format(
+        question=question,
+        answer=answer,
+        contexts=contexts_str,
     )
+    try:
+        raw = await judge.a_generate(prompt)
+        scores = _parse_scores(
+            raw, ["faithfulness", "relevancy", "context_relevancy", "abstention_quality"]
+        )
+        return scores
+    except Exception as e:
+        logger.error("Prompt A scoring failed: %s", e, exc_info=True)
+        return {
+            "faithfulness": None,
+            "relevancy": None,
+            "context_relevancy": None,
+            "abstention_quality": None,
+        }
 
 
-def _correctness_metric(judge: DeepEvalBaseLLM) -> GEval:
-    """GEval metric: is what the answer said factually consistent with the expected answer?"""
-    return GEval(
-        name="Correctness",
-        criteria=(
-            "Evaluate whether the claims and facts in the actual output are consistent with "
-            "the expected output. Penalize any statements that contradict, misstate, or "
-            "distort information from the expected output."
-        ),
-        evaluation_steps=[
-            "Identify factual claims in the actual output.",
-            "Compare each claim against the expected output for consistency.",
-            "Penalize contradictions and misstatements.",
-            "A score of 1.0 means fully correct; 0.0 means entirely incorrect.",
-        ],
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
-        model=judge,
-        threshold=0.0,
-        async_mode=True,
+async def _run_prompt_b(
+    judge: MaaSJudgeModel,
+    question: str,
+    answer: str,
+    expected_answer: str,
+    contexts: list[str],
+) -> dict[str, float | None]:
+    """Run consolidated Prompt B: completeness, correctness, compliance_accuracy, context_precision."""
+    contexts_str = "\n---\n".join(contexts) if contexts else "(no context provided)"
+    prompt = _PROMPT_B.format(
+        question=question,
+        answer=answer,
+        expected_answer=expected_answer,
+        contexts=contexts_str,
     )
+    try:
+        raw = await judge.a_generate(prompt)
+        scores = _parse_scores(
+            raw,
+            ["completeness", "correctness", "compliance_accuracy", "context_precision"],
+        )
+        return scores
+    except Exception as e:
+        logger.error("Prompt B scoring failed: %s", e, exc_info=True)
+        return {
+            "completeness": None,
+            "correctness": None,
+            "compliance_accuracy": None,
+            "context_precision": None,
+        }
 
 
-def _compliance_accuracy_metric(judge: DeepEvalBaseLLM) -> GEval:
-    """GEval metric: are domain-specific compliance items correctly handled?"""
-    return GEval(
-        name="Compliance Accuracy",
-        criteria=(
-            "Evaluate whether the answer correctly handles domain-specific compliance items: "
-            "obligations, restrictions, approvals, disclosures, thresholds, escalation "
-            "conditions, evidence requirements, and cited authorities. Check that claims are "
-            "supported by the retrieval context and that critical requirements from the "
-            "expected output are not omitted."
-        ),
-        evaluation_steps=[
-            "Identify compliance-relevant items in the expected output (obligations, "
-            "thresholds, restrictions, disclosures, authorities).",
-            "Check whether each item is present and correctly stated in the actual output.",
-            "Verify that compliance claims are supported by the retrieval context.",
-            "Penalize omitted critical requirements and unsupported claims.",
-            "A score of 1.0 means full compliance accuracy; 0.0 means none.",
-        ],
-        evaluation_params=[
-            LLMTestCaseParams.ACTUAL_OUTPUT,
-            LLMTestCaseParams.EXPECTED_OUTPUT,
-            LLMTestCaseParams.RETRIEVAL_CONTEXT,
-        ],
-        model=judge,
-        threshold=0.0,
-        async_mode=True,
-    )
-
-
-def _abstention_metric(judge: DeepEvalBaseLLM) -> GEval:
-    """GEval metric: does the answer appropriately handle uncertainty?"""
-    return GEval(
-        name="Abstention Quality",
-        criteria=(
-            "Evaluate whether the answer appropriately handles uncertainty. When the "
-            "retrieval context does not contain sufficient information to fully answer "
-            "the question, the answer should explicitly acknowledge the limitation rather "
-            "than fabricating or guessing. Penalize confident-sounding answers that go "
-            "beyond what the context supports."
-        ),
-        evaluation_steps=[
-            "Assess whether the retrieval context contains enough information to answer "
-            "the question.",
-            "If context is sufficient, check that the answer uses it appropriately "
-            "(score 1.0 for correct use).",
-            "If context is insufficient, check that the answer acknowledges the gap.",
-            "Penalize confident assertions not supported by the retrieval context.",
-            "A score of 1.0 means appropriate handling; 0.0 means confidently wrong.",
-        ],
-        evaluation_params=[
-            LLMTestCaseParams.INPUT,
-            LLMTestCaseParams.ACTUAL_OUTPUT,
-            LLMTestCaseParams.RETRIEVAL_CONTEXT,
-        ],
-        model=judge,
-        threshold=0.0,
-        async_mode=True,
-    )
-
+# ---------------------------------------------------------------------------
+# Chunk alignment (deterministic, no LLM)
+# ---------------------------------------------------------------------------
 
 _CHUNK_MATCH_NGRAM_SIZE = 4
 _CHUNK_MATCH_MIN_NGRAMS = 3
@@ -321,6 +412,11 @@ def compute_chunk_alignment(
     return matched / len(expected_chunks)
 
 
+# ---------------------------------------------------------------------------
+# Main scoring entry point
+# ---------------------------------------------------------------------------
+
+
 async def score_result(
     question: str,
     answer: str,
@@ -329,14 +425,14 @@ async def score_result(
     *,
     evaluated_model_name: str = "",
 ) -> dict:
-    """Score a single RAG response using DeepEval metrics.
+    """Score a single RAG response using consolidated judge prompts.
 
-    Always runs: faithfulness, answer relevancy, context relevancy, abstention.
-    When expected_answer is provided: also runs completeness, correctness,
-    compliance accuracy, and context precision.
+    Runs two prompts concurrently:
+    - Prompt A (always): faithfulness, relevancy, context_relevancy, abstention
+    - Prompt B (when expected_answer provided): completeness, correctness,
+      compliance_accuracy, context_precision
 
-    All metrics use threshold=0.0 (raw scores only). Pass/fail logic lives
-    in the verdict layer using profile thresholds.
+    Reduces judge calls from 8 to at most 2 per question.
 
     Args:
         question: The input question.
@@ -363,52 +459,29 @@ async def score_result(
 
     judge = _get_judge_model(judge_model_name)
 
-    test_case = LLMTestCase(
-        input=question,
-        actual_output=answer,
-        retrieval_context=contexts,
-        expected_output=expected_answer,
-    )
-
     scores: dict = {}
 
-    # Always-on metrics (no expected_answer needed)
-    metrics: list[tuple[str, object]] = [
-        ("groundedness_score", FaithfulnessMetric(model=judge, threshold=0.0, async_mode=True)),
-        ("relevancy_score", AnswerRelevancyMetric(model=judge, threshold=0.0, async_mode=True)),
-        (
-            "context_relevancy_score",
-            ContextualRelevancyMetric(model=judge, threshold=0.0, async_mode=True),
-        ),
-        ("abstention_score", _abstention_metric(judge)),
-    ]
-
-    # Metrics that require expected_answer (ground truth)
     if expected_answer:
-        metrics.extend(
-            [
-                (
-                    "context_precision_score",
-                    ContextualPrecisionMetric(model=judge, threshold=0.0, async_mode=True),
-                ),
-                ("completeness_score", _completeness_metric(judge)),
-                ("correctness_score", _correctness_metric(judge)),
-                ("compliance_accuracy_score", _compliance_accuracy_metric(judge)),
-            ]
+        prompt_a_result, prompt_b_result = await asyncio.gather(
+            _run_prompt_a(judge, question, answer, contexts),
+            _run_prompt_b(judge, question, answer, expected_answer, contexts),
         )
+    else:
+        prompt_a_result = await _run_prompt_a(judge, question, answer, contexts)
+        prompt_b_result = None
 
-    # Run all metrics concurrently -- each is an independent LLM judge call
-    async def _measure(name: str, metric):
-        try:
-            await metric.a_measure(test_case)
-            return name, metric.score
-        except Exception as e:
-            logger.error("Scoring failed for %s: %s", name, e, exc_info=True)
-            return name, None
+    # Map prompt A results to canonical score keys
+    scores["groundedness_score"] = prompt_a_result.get("faithfulness")
+    scores["relevancy_score"] = prompt_a_result.get("relevancy")
+    scores["context_relevancy_score"] = prompt_a_result.get("context_relevancy")
+    scores["abstention_score"] = prompt_a_result.get("abstention_quality")
 
-    results = await asyncio.gather(*[_measure(name, metric) for name, metric in metrics])
-    for name, score in results:
-        scores[name] = score
+    # Map prompt B results when available
+    if prompt_b_result:
+        scores["completeness_score"] = prompt_b_result.get("completeness")
+        scores["correctness_score"] = prompt_b_result.get("correctness")
+        scores["compliance_accuracy_score"] = prompt_b_result.get("compliance_accuracy")
+        scores["context_precision_score"] = prompt_b_result.get("context_precision")
 
     groundedness = scores.get("groundedness_score")
     if groundedness is not None:
