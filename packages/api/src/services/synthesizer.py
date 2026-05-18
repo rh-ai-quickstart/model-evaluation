@@ -18,6 +18,16 @@ from .truth_generation import generate_truth_from_synthesis
 
 logger = logging.getLogger(__name__)
 
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=GENERATION_TIMEOUT)
+    return _client
+
+
 MAX_CONTEXTS = 50
 _MIN_CHUNKS_PER_DOC = 2
 
@@ -240,9 +250,9 @@ async def generate_questions(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=GENERATION_TIMEOUT) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
+        client = _get_client()
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
 
         data = response.json()
         text = data["choices"][0]["message"]["content"]
@@ -259,13 +269,15 @@ async def generate_questions(
                     }
                 )
 
-        # Generate structured truth for each question with an expected answer
+        # Generate structured truth for each question with an expected answer (parallel)
         judge_model = settings.resolved_judge_model_name
         if judge_model and chunk_data:
-            for q in questions:
+            truth_tasks = []
+            truth_indices = []
+            for i, q in enumerate(questions):
                 if q.get("expected_answer"):
-                    try:
-                        truth = await generate_truth_from_synthesis(
+                    truth_tasks.append(
+                        generate_truth_from_synthesis(
                             q["question"],
                             q["expected_answer"],
                             chunk_data,
@@ -273,9 +285,20 @@ async def generate_questions(
                             session=session,
                             retrieval_kwargs=retrieval_kwargs,
                         )
-                        q["truth"] = truth
-                    except Exception as e:
-                        logger.warning("Truth generation failed for synthesized question: %s", e)
+                    )
+                    truth_indices.append(i)
+
+            if truth_tasks:
+                import asyncio
+
+                results = await asyncio.gather(*truth_tasks, return_exceptions=True)
+                for idx, result in zip(truth_indices, results):
+                    if isinstance(result, Exception):
+                        logger.warning(
+                            "Truth generation failed for synthesized question: %s", result
+                        )
+                    else:
+                        questions[idx]["truth"] = result
 
         return questions
 

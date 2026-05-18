@@ -116,6 +116,10 @@ def check_chunk_alignment(
     Supporting chunk refs are reported informatively but excluded
     from the pass/fail threshold.
 
+    Falls back to text-based n-gram matching when ID matching yields
+    zero hits and expected_chunk_texts are available (handles document
+    re-uploads where chunk IDs change).
+
     Args:
         truth: Structured truth payload with chunk reference expectations.
         retrieved_chunks: Chunks from retrieval pipeline.
@@ -125,6 +129,7 @@ def check_chunk_alignment(
     """
     expected_refs = truth.retrieval_truth.expected_chunk_refs
     supporting_refs = truth.retrieval_truth.supporting_chunk_refs
+    expected_texts = truth.retrieval_truth.expected_chunk_texts
     if not expected_refs:
         return CheckResult(
             check_name="chunk_alignment",
@@ -139,6 +144,16 @@ def check_chunk_alignment(
             retrieved_ids.add(int(chunk["id"]))
 
     matched = _count_chunk_matches(expected_refs, retrieved_ids)
+
+    # Text-based fallback when ID matching finds nothing
+    if matched == 0 and expected_texts:
+        from .scoring import _text_overlap_match
+
+        retrieved_texts = [c.get("text", "") for c in retrieved_chunks if c.get("text")]
+        for exp_text in expected_texts:
+            if exp_text and _text_overlap_match(exp_text, retrieved_texts):
+                matched += 1
+
     recall = matched / len(expected_refs)
     passed = recall >= 0.5
 

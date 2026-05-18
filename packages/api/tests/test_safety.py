@@ -60,12 +60,11 @@ def _mock_guard_response(content: str):
 @pytest.mark.asyncio
 async def test_safe_input_returns_is_safe(_safety_configured):
     """Should return is_safe=True when guard model responds 'safe'."""
-    with patch("src.services.safety.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = _mock_guard_response("safe")
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_guard_response("safe")
+    mock_client.is_closed = False
 
+    with patch("src.services.safety._get_client", return_value=mock_client):
         result = await check_input_safety("What are the capital requirements?")
 
     assert result.is_safe is True
@@ -75,12 +74,11 @@ async def test_safe_input_returns_is_safe(_safety_configured):
 @pytest.mark.asyncio
 async def test_unsafe_input_returns_category(_safety_configured):
     """Should return is_safe=False with category when guard flags content."""
-    with patch("src.services.safety.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = _mock_guard_response("unsafe\nS1")
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_guard_response("unsafe\nS1")
+    mock_client.is_closed = False
 
+    with patch("src.services.safety._get_client", return_value=mock_client):
         result = await check_input_safety("harmful content here")
 
     assert result.is_safe is False
@@ -90,16 +88,14 @@ async def test_unsafe_input_returns_category(_safety_configured):
 @pytest.mark.asyncio
 async def test_output_safety_checks_assistant_role(_safety_configured):
     """Should call guard with assistant role for output checks."""
-    with patch("src.services.safety.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = _mock_guard_response("safe")
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_guard_response("safe")
+    mock_client.is_closed = False
 
+    with patch("src.services.safety._get_client", return_value=mock_client):
         result = await check_output_safety("This is a safe response.")
 
     assert result.is_safe is True
-    # Verify the role sent in the request
     call_kwargs = mock_client.post.call_args
     payload = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
     assert payload["messages"][0]["role"] == "assistant"
@@ -125,12 +121,11 @@ async def test_skips_when_safety_disabled(_safety_disabled):
 @pytest.mark.asyncio
 async def test_returns_safe_on_timeout(_safety_configured):
     """Should degrade gracefully on timeout."""
-    with patch("src.services.safety.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.side_effect = httpx.TimeoutException("timed out")
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.post.side_effect = httpx.TimeoutException("timed out")
+    mock_client.is_closed = False
 
+    with patch("src.services.safety._get_client", return_value=mock_client):
         result = await check_input_safety("test question")
 
     assert result.is_safe is True
@@ -139,16 +134,15 @@ async def test_returns_safe_on_timeout(_safety_configured):
 @pytest.mark.asyncio
 async def test_returns_safe_on_http_error(_safety_configured):
     """Should degrade gracefully on HTTP error."""
-    with patch("src.services.safety.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_response = AsyncMock(spec=httpx.Response)
-        mock_response.status_code = 500
-        mock_client.post.side_effect = httpx.HTTPStatusError(
-            "server error", request=AsyncMock(), response=mock_response
-        )
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_response = AsyncMock(spec=httpx.Response)
+    mock_response.status_code = 500
+    mock_client.post.side_effect = httpx.HTTPStatusError(
+        "server error", request=AsyncMock(), response=mock_response
+    )
+    mock_client.is_closed = False
 
+    with patch("src.services.safety._get_client", return_value=mock_client):
         result = await check_output_safety("test response")
 
     assert result.is_safe is True

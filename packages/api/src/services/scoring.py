@@ -221,9 +221,40 @@ def _abstention_metric(judge: DeepEvalBaseLLM) -> GEval:
     )
 
 
+_CHUNK_MATCH_NGRAM_SIZE = 4
+_CHUNK_MATCH_MIN_NGRAMS = 3
+
+
+def _text_overlap_match(
+    expected_text: str,
+    retrieved_texts: list[str],
+    ngram_size: int = _CHUNK_MATCH_NGRAM_SIZE,
+    min_ngrams: int = _CHUNK_MATCH_MIN_NGRAMS,
+) -> bool:
+    """Check if an expected chunk's text overlaps substantially with any retrieved chunk."""
+    expected_words = expected_text.lower().split()
+    if len(expected_words) < ngram_size:
+        return any(expected_text.lower() in rt.lower() for rt in retrieved_texts)
+
+    expected_ngrams: set[str] = set()
+    for i in range(len(expected_words) - ngram_size + 1):
+        expected_ngrams.add(" ".join(expected_words[i : i + ngram_size]))
+
+    for rt in retrieved_texts:
+        rt_words = rt.lower().split()
+        hits = 0
+        for i in range(len(rt_words) - ngram_size + 1):
+            if " ".join(rt_words[i : i + ngram_size]) in expected_ngrams:
+                hits += 1
+                if hits >= min_ngrams:
+                    return True
+    return False
+
+
 def compute_chunk_alignment(
     retrieved_chunks: list[dict],
     expected_chunks: list[str],
+    expected_chunk_texts: list[str] | None = None,
 ) -> float:
     """Score how well retrieved chunks match expected source chunks.
 
@@ -234,10 +265,16 @@ def compute_chunk_alignment(
     - ``"filename.pdf:3"`` -- legacy format, matches on document + page
     - ``"filename.pdf"`` -- legacy format, matches on document name only
 
+    When ID-based matching yields zero hits and ``expected_chunk_texts``
+    is provided, falls back to n-gram text overlap matching. This handles
+    the case where documents were re-uploaded (new chunk IDs).
+
     Args:
         retrieved_chunks: Chunks from retrieval, each with ``id``,
             ``source_document``, and optionally ``page_number``.
         expected_chunks: Expected chunk references.
+        expected_chunk_texts: Optional text content of expected chunks
+            for text-based fallback matching.
 
     Returns:
         Recall score between 0.0 and 1.0 (matched / expected).
@@ -260,7 +297,6 @@ def compute_chunk_alignment(
     matched = 0
     for ref in expected_chunks:
         if ref.startswith("chunk:"):
-            # Canonical chunk ID format
             try:
                 chunk_id = int(ref[6:])
                 if chunk_id in retrieved_ids:
@@ -269,12 +305,17 @@ def compute_chunk_alignment(
                 pass
         elif ":" in ref:
             doc, page = ref.rsplit(":", 1)
-            # Match on both document and page
             if (doc, page) in retrieved_set:
                 matched += 1
         else:
-            # Match on document name only
             if ref in retrieved_docs:
+                matched += 1
+
+    # Text-based fallback when ID matching finds nothing
+    if matched == 0 and expected_chunk_texts:
+        retrieved_texts = [c.get("text", "") for c in retrieved_chunks if c.get("text")]
+        for exp_text in expected_chunk_texts:
+            if exp_text and _text_overlap_match(exp_text, retrieved_texts):
                 matched += 1
 
     return matched / len(expected_chunks)

@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
-from .embedding import generate_embeddings
+from .embedding import QUERY_PREFIX, generate_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ async def retrieve_chunks(
         doc_count = await _count_ready_documents(session)
     search_depth = compute_search_depth(rerank_depth, diversity_min, doc_count)
 
-    result = await generate_embeddings([query])
+    result = await generate_embeddings([query], prefix=QUERY_PREFIX)
 
     if result.vectors:
         vector_results = await _vector_search(result.vectors[0], session, search_depth)

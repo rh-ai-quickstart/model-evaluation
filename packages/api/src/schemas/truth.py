@@ -38,6 +38,10 @@ class RetrievalTruth(BaseModel):
     expected_chunk_refs: list[str] = Field(
         default_factory=list, description='Canonical chunk references in "chunk:{id}" format.'
     )
+    expected_chunk_texts: list[str] = Field(
+        default_factory=list,
+        description="Text content of expected chunks for text-based fallback matching.",
+    )
     supporting_documents: list[str] = Field(
         default_factory=list,
         description="Documents with marginal relevance (background, examples, secondary details).",

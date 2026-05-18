@@ -26,32 +26,42 @@ class EmbeddingsResult:
 
 
 EMBEDDING_TIMEOUT = 60.0  # seconds
-BATCH_SIZE = 16  # chunks per request; each chunk is pre-truncated to ~150 words
+BATCH_SIZE = 16  # chunks per request
 RATE_LIMIT_RETRIES = 5
 RATE_LIMIT_BACKOFF = 2.0  # seconds; doubles each retry
 
-# Nomic-embed-text (and similar) caps inputs at 512 tokens. Word counts alone are unsafe:
-# technical text often exceeds ~2 tokens/word; PDFs can yield huge single "words" with no spaces.
-MAX_EMBED_WORDS = 150
-MAX_EMBED_CHARS = 1800
+# nomic-embed-text-v1.5 supports up to 8192 tokens (~3000 words).
+MAX_EMBED_WORDS = 600
+MAX_EMBED_CHARS = 4000
+
+# nomic-embed-text-v1.5 requires task prefixes for asymmetric retrieval.
+DOCUMENT_PREFIX = "search_document: "
+QUERY_PREFIX = "search_query: "
 
 
-def _truncate(text: str) -> str:
-    """Truncate text to stay within the embedding model's token limit."""
+def _truncate(text: str, prefix: str = "") -> str:
+    """Truncate text to stay within the embedding model's token limit, then prepend prefix."""
     t = text.strip()
     if len(t) > MAX_EMBED_CHARS:
         t = t[:MAX_EMBED_CHARS]
     words = t.split()
     if len(words) > MAX_EMBED_WORDS:
-        return " ".join(words[:MAX_EMBED_WORDS])
-    return t
+        t = " ".join(words[:MAX_EMBED_WORDS])
+    return f"{prefix}{t}" if prefix else t
 
 
-async def generate_embeddings(texts: list[str]) -> EmbeddingsResult:
+async def generate_embeddings(
+    texts: list[str],
+    prefix: str = "",
+) -> EmbeddingsResult:
     """Generate embeddings for texts via the MaaS endpoint.
 
     Truncates long texts and sends in batches to avoid token and
     request size limits. On failure, ``vectors`` is None and ``error`` explains why.
+
+    Args:
+        texts: Input texts to embed.
+        prefix: Task prefix for nomic models (``DOCUMENT_PREFIX`` or ``QUERY_PREFIX``).
     """
     if not settings.API_TOKEN:
         msg = (
@@ -78,7 +88,7 @@ async def generate_embeddings(texts: list[str]) -> EmbeddingsResult:
         "Content-Type": "application/json",
     }
 
-    truncated = [_truncate(t) for t in texts]
+    truncated = [_truncate(t, prefix) for t in texts]
     logger.info(
         "Embedding %d texts (max words after truncation: %d, max chars: %d)",
         len(truncated),

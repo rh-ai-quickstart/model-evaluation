@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.services.embedding import MAX_EMBED_CHARS, _truncate, generate_embeddings
+from src.services.embedding import MAX_EMBED_CHARS, MAX_EMBED_WORDS, _truncate, generate_embeddings
 
 
 @pytest.fixture(autouse=True)
@@ -30,10 +30,10 @@ def test_truncate_char_cap_for_pdf_style_globs():
 
 
 def test_truncate_word_cap():
-    """Many short words must be capped for 512-token embedding models."""
-    words = "w " * 400
+    """Many short words must be capped at MAX_EMBED_WORDS."""
+    words = "w " * (MAX_EMBED_WORDS + 200)
     out = _truncate(words.strip())
-    assert len(out.split()) <= 150
+    assert len(out.split()) <= MAX_EMBED_WORDS
 
 
 def test_returns_none_when_no_token():
