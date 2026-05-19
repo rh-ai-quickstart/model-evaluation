@@ -34,6 +34,7 @@ from ..services.deterministic_checks import run_deterministic_checks
 from ..services.generation import generate_answer
 from ..services.profiles import EvalProfile, list_profiles, load_profile
 from ..services.query_decomposition import decompose_query
+from ..services.embedding import QUERY_PREFIX, generate_embeddings
 from ..services.retrieval import _apply_diversity, _deduplicate_chunks, retrieve_chunks
 from ..services.scoring import compute_chunk_alignment, score_result
 from ..services.synthesizer import generate_questions
@@ -195,17 +196,34 @@ async def _process_question(
                     sub_queries,
                 )
 
-                async def _retrieve_for_sq(sq_idx: int, sq: str) -> tuple[int, str, list[dict]]:
+                # Batch-embed all queries in a single API call (N calls -> 1)
+                embed_result = await generate_embeddings(all_queries, prefix=QUERY_PREFIX)
+                query_embeddings = embed_result.vectors
+
+                async def _retrieve_for_sq(
+                    sq_idx: int, sq: str, embedding: list[float] | None = None,
+                ) -> tuple[int, str, list[dict]]:
                     async with SessionLocal() as retrieval_session:
                         sq_chunks = await retrieve_chunks(
                             query=sq,
                             session=retrieval_session,
+                            query_embedding=embedding,
                             **rk,
                         )
                     return sq_idx, sq, sq_chunks
 
                 retrieved_lists = await asyncio.gather(
-                    *[_retrieve_for_sq(i, sq) for i, sq in enumerate(all_queries)]
+                    *[
+                        _retrieve_for_sq(
+                            i, sq,
+                            embedding=(
+                                query_embeddings[i]
+                                if query_embeddings and i < len(query_embeddings)
+                                else None
+                            ),
+                        )
+                        for i, sq in enumerate(all_queries)
+                    ]
                 )
 
                 all_chunks: list[dict] = []
@@ -378,7 +396,14 @@ async def _process_question(
             if eval_run_id in _cancelled_runs:
                 return result
 
-            if gen_result["answer"]:
+            # Short-circuit: skip expensive LLM scoring when retrieval returned nothing
+            if not chunks:
+                logger.info(
+                    "Skipping LLM scoring -- no chunks retrieved for '%.60s'",
+                    question,
+                )
+
+            if gen_result["answer"] and chunks:
                 pre_concepts = None
                 if (
                     expected_answer
