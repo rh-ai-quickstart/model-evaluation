@@ -42,15 +42,22 @@ def _make_prompt_a_response(
 
 
 def _make_prompt_b_response(
-    completeness=0.80, correctness=0.90, compliance_accuracy=0.85, context_precision=0.75
+    completeness=0.80,
+    correctness=0.90,
+    compliance_accuracy=0.85,
+    context_precision=0.75,
+    concept_coverage=None,
 ):
     """Build a valid Prompt B JSON response."""
-    return json.dumps({
+    data = {
         "completeness": completeness,
         "correctness": correctness,
         "compliance_accuracy": compliance_accuracy,
         "context_precision": context_precision,
-    })
+    }
+    if concept_coverage is not None:
+        data["concept_coverage"] = concept_coverage
+    return json.dumps(data)
 
 
 @pytest.mark.asyncio
@@ -472,6 +479,150 @@ def test_chunk_alignment_mixed_chunk_id_and_legacy():
     ]
     expected = ["chunk:42", "report.pdf:1"]
     assert compute_chunk_alignment(retrieved, expected) == 1.0
+
+
+# --- Concept coverage tests ---
+
+
+def test_parse_concept_coverage_from_json():
+    """Should extract concept_coverage array from JSON response."""
+    from src.services.scoring import _parse_concept_coverage
+
+    raw = json.dumps({
+        "completeness": 0.80,
+        "concept_coverage": ["covered", "missing", "covered"],
+    })
+    result = _parse_concept_coverage(raw, 3)
+    assert result == ["covered", "missing", "covered"]
+
+
+def test_parse_concept_coverage_pads_short_array():
+    """Should pad with 'missing' when array is shorter than expected."""
+    from src.services.scoring import _parse_concept_coverage
+
+    raw = json.dumps({"concept_coverage": ["covered"]})
+    result = _parse_concept_coverage(raw, 3)
+    assert result == ["covered", "missing", "missing"]
+
+
+def test_parse_concept_coverage_truncates_long_array():
+    """Should truncate when array is longer than expected."""
+    from src.services.scoring import _parse_concept_coverage
+
+    raw = json.dumps({"concept_coverage": ["covered", "missing", "covered", "covered"]})
+    result = _parse_concept_coverage(raw, 2)
+    assert result == ["covered", "missing"]
+
+
+def test_parse_concept_coverage_regex_fallback():
+    """Should extract concept_coverage via regex when JSON parsing fails."""
+    from src.services.scoring import _parse_concept_coverage
+
+    raw = 'some text "concept_coverage": ["covered", "missing"] more text'
+    result = _parse_concept_coverage(raw, 2)
+    assert result == ["covered", "missing"]
+
+
+def test_parse_concept_coverage_returns_none_when_missing():
+    """Should return None when concept_coverage is not in the response."""
+    from src.services.scoring import _parse_concept_coverage
+
+    raw = json.dumps({"completeness": 0.80})
+    result = _parse_concept_coverage(raw, 3)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_score_result_with_concepts_returns_coverage_gaps(_mock_settings):
+    """Should return coverage_gaps when required_concepts are provided."""
+    from src.services.scoring import score_result
+
+    prompt_a_resp = _make_prompt_a_response()
+    prompt_b_resp = _make_prompt_b_response(
+        concept_coverage=["covered", "missing", "covered"],
+    )
+
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(side_effect=[prompt_a_resp, prompt_b_resp])
+        mock_judge_cls.return_value = mock_judge
+
+        result = await score_result(
+            question="What are ETF requirements?",
+            answer="ETFs must file registration forms and provide transparency.",
+            contexts=["Form N-1A requires registration."],
+            expected_answer="ETFs must file forms, provide transparency, and report quarterly.",
+            required_concepts=[
+                "ETF registration forms",
+                "quarterly reporting",
+                "portfolio transparency",
+            ],
+        )
+
+    gaps = result["coverage_gaps"]
+    assert gaps["concepts"] == [
+        "ETF registration forms",
+        "quarterly reporting",
+        "portfolio transparency",
+    ]
+    assert gaps["covered"] == ["ETF registration forms", "portfolio transparency"]
+    assert gaps["missing"] == ["quarterly reporting"]
+    assert gaps["coverage_ratio"] == pytest.approx(2 / 3)
+
+
+@pytest.mark.asyncio
+async def test_score_result_concepts_classifies_failures(_mock_settings):
+    """Should classify missing concepts as retrieval or generation failures."""
+    from src.services.scoring import score_result
+
+    prompt_a_resp = _make_prompt_a_response()
+    prompt_b_resp = _make_prompt_b_response(
+        concept_coverage=["covered", "missing", "missing"],
+    )
+
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(side_effect=[prompt_a_resp, prompt_b_resp])
+        mock_judge_cls.return_value = mock_judge
+
+        result = await score_result(
+            question="What are the requirements?",
+            answer="ETFs must file registration forms.",
+            contexts=["Form N-PORT requires quarterly filing of portfolio holdings."],
+            expected_answer="Registration, quarterly filing, blockchain custody.",
+            required_concepts=[
+                "registration forms",
+                "quarterly filing deadline",
+                "blockchain custody requirements",
+            ],
+        )
+
+    gaps = result["coverage_gaps"]
+    assert "quarterly filing deadline" in gaps["generation_failures"]
+    assert "blockchain custody requirements" in gaps["retrieval_failures"]
+
+
+@pytest.mark.asyncio
+async def test_score_result_no_coverage_gaps_without_concepts(_mock_settings):
+    """Should not include coverage_gaps when no concepts are provided."""
+    from src.services.scoring import score_result
+
+    prompt_a_resp = _make_prompt_a_response()
+    prompt_b_resp = _make_prompt_b_response()
+
+    with patch("src.services.scoring.MaaSJudgeModel") as mock_judge_cls:
+        mock_judge = MagicMock()
+        mock_judge.a_generate = AsyncMock(side_effect=[prompt_a_resp, prompt_b_resp])
+        mock_judge_cls.return_value = mock_judge
+
+        result = await score_result(
+            question="What is AI?",
+            answer="AI is artificial intelligence.",
+            contexts=["AI stands for artificial intelligence."],
+            expected_answer="AI is artificial intelligence.",
+        )
+
+    assert "coverage_gaps" not in result
 
 
 def test_resolved_judge_model_name_order():

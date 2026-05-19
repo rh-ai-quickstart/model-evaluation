@@ -30,7 +30,6 @@ from ..schemas.evaluation import (
     SynthesizeRequest,
     SynthesizeResponse,
 )
-from ..services.coverage import detect_coverage_gaps
 from ..services.deterministic_checks import run_deterministic_checks
 from ..services.generation import generate_answer
 from ..services.profiles import EvalProfile, list_profiles, load_profile
@@ -380,33 +379,24 @@ async def _process_question(
                 return result
 
             if gen_result["answer"]:
-                scoring_coro = score_result(
+                pre_concepts = None
+                if (
+                    expected_answer
+                    and q_item.truth
+                    and q_item.truth.answer_truth.required_concepts
+                ):
+                    pre_concepts = q_item.truth.answer_truth.required_concepts
+
+                result.scores = await score_result(
                     question=question,
                     answer=gen_result["answer"],
                     contexts=context_texts,
                     expected_answer=expected_answer,
                     evaluated_model_name=model_name,
+                    required_concepts=pre_concepts,
                 )
 
-                coverage_coro = None
-                if expected_answer:
-                    pre_concepts = None
-                    if q_item.truth and q_item.truth.answer_truth.required_concepts:
-                        pre_concepts = q_item.truth.answer_truth.required_concepts
-                    coverage_coro = detect_coverage_gaps(
-                        expected_answer=expected_answer,
-                        actual_answer=gen_result["answer"],
-                        contexts=context_texts or None,
-                        question=question,
-                        pre_extracted_concepts=pre_concepts,
-                    )
-
-                if coverage_coro:
-                    result.scores, result.coverage_gaps = await asyncio.gather(
-                        scoring_coro, coverage_coro
-                    )
-                else:
-                    result.scores = await scoring_coro
+                result.coverage_gaps = result.scores.pop("coverage_gaps", None)
 
             # Compute per-question verdict if profile is loaded
             if profile and result.scores:
@@ -1282,16 +1272,34 @@ async def rerun_eval(
     # Snapshot run metadata for reproducibility (same as create_eval_run)
     retrieval_cfg = None
     profile_version = None
+    truth_retrieval_kwargs = None
     profile_id = original_run.profile_id
     if profile_id:
         try:
             prof = load_profile(profile_id)
             retrieval_cfg = prof.retrieval.model_dump()
             profile_version = prof.version
+            truth_retrieval_kwargs = _build_retrieval_kwargs(prof)
         except (FileNotFoundError, ValueError):
             pass
 
+    # Regenerate truth for questions that are missing it (e.g., original
+    # run's truth generation failed silently or predated truth support)
     judge_model = settings.resolved_judge_model_name
+    if judge_model:
+        for q in questions:
+            if q.expected_answer and not q.truth:
+                try:
+                    q.truth = await generate_truth_from_manual_answer(
+                        q.question,
+                        q.expected_answer,
+                        session,
+                        judge_model,
+                        retrieval_kwargs=truth_retrieval_kwargs,
+                    )
+                except Exception as e:
+                    logger.warning("Truth generation failed for rerun question: %s", e)
+
     corpus_snapshot = await _build_corpus_snapshot(session)
 
     run = EvalRun(
