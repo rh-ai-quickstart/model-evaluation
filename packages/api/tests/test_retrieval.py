@@ -479,3 +479,71 @@ def test_diversity_threshold_zero_promotes_all():
     )
     docs = {c["source_document"] for c in result}
     assert "b.pdf" in docs
+
+
+# --- Pre-computed embedding tests ---
+
+
+def test_retrieve_chunks_uses_precomputed_embedding(mock_session):
+    """Should skip generate_embeddings when query_embedding is provided."""
+    import asyncio
+
+    pre_embedding = [0.1, 0.2, 0.3]
+    vector_results = [_chunk(1, doc="a.pdf")]
+
+    with (
+        patch(
+            "src.services.retrieval.generate_embeddings",
+            new_callable=AsyncMock,
+        ) as mock_embed,
+        patch(
+            "src.services.retrieval._vector_search",
+            new_callable=AsyncMock,
+            return_value=vector_results,
+        ) as mock_vs,
+        patch(
+            "src.services.retrieval._keyword_search",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+    ):
+        result = asyncio.run(
+            retrieve_chunks(
+                "test query", mock_session, diversity_min=1,
+                query_embedding=pre_embedding,
+            ),
+        )
+
+    mock_embed.assert_not_called()
+    mock_vs.assert_called_once()
+    assert mock_vs.call_args[0][0] == pre_embedding
+    assert len(result) == 1
+
+
+def test_retrieve_chunks_falls_back_when_no_precomputed_embedding(mock_session):
+    """Should call generate_embeddings when query_embedding is None."""
+    import asyncio
+
+    with (
+        patch(
+            "src.services.retrieval.generate_embeddings",
+            new_callable=AsyncMock,
+            return_value=EmbeddingsResult(vectors=[[0.1, 0.2]], error=None),
+        ) as mock_embed,
+        patch(
+            "src.services.retrieval._vector_search",
+            new_callable=AsyncMock,
+            return_value=[_chunk(1)],
+        ),
+        patch(
+            "src.services.retrieval._keyword_search",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+    ):
+        result = asyncio.run(
+            retrieve_chunks("test query", mock_session, diversity_min=1),
+        )
+
+    mock_embed.assert_called_once()
+    assert len(result) == 1

@@ -70,6 +70,7 @@ async def retrieve_chunks(
     keyword_enabled: bool = True,
     dedup_threshold: float = 0.85,
     diversity_relevance_threshold: float = 0.3,
+    query_embedding: list[float] | None = None,
 ) -> list[dict]:
     """Retrieve the most relevant chunks for a query.
 
@@ -92,6 +93,9 @@ async def retrieve_chunks(
         diversity_relevance_threshold: Minimum score a document's best chunk must
             have to qualify for guaranteed diversity slots. Documents below this
             threshold get zero guaranteed representation.
+        query_embedding: Pre-computed embedding vector for the query. When
+            provided, skips the internal embedding call (useful for batched
+            multi-query retrieval).
 
     Returns:
         List of dicts with 'id', 'text', 'source_document', 'page_number',
@@ -102,44 +106,45 @@ async def retrieve_chunks(
         doc_count = await _count_ready_documents(session)
     search_depth = compute_search_depth(rerank_depth, diversity_min, doc_count)
 
-    result = await generate_embeddings([query], prefix=QUERY_PREFIX)
-
-    if result.vectors:
-        vector_results = await _vector_search(result.vectors[0], session, search_depth)
+    if query_embedding is not None:
+        vector_results = await _vector_search(query_embedding, session, search_depth)
     else:
-        # Without vectors, never jump straight to "recent chunks" — that path ignores the
-        # query and makes every eval question receive identical context (same answers at temp 0).
-        logger.warning(
-            "No query embeddings (%s); trying keyword-only retrieval before non-query fallback",
-            result.error or "vectors absent",
-        )
-        keyword_only: list[dict] = []
-        if keyword_enabled:
-            keyword_only = await _keyword_search(query, session, search_depth)
-        if keyword_only:
-            deduped = _deduplicate_chunks(keyword_only, dedup_threshold)
-            final = _apply_diversity(
-                deduped,
-                top_k,
-                max_per_doc,
-                diversity_min,
-                diversity_relevance_threshold,
-            )
-            kw_doc_counts: dict[str, int] = defaultdict(int)
-            for chunk in final:
-                kw_doc_counts[chunk["source_document"]] += 1
-            logger.info(
-                "Embedding-less retrieval: keyword-only -> %d chunks, doc distribution: %s",
-                len(final),
-                dict(kw_doc_counts),
-            )
-            return final
+        result = await generate_embeddings([query], prefix=QUERY_PREFIX)
 
-        logger.error(
-            "Embeddings unavailable and keyword search returned no hits — "
-            "using recent chunks (identical for all queries). Fix embedding service or corpus."
-        )
-        return await _fallback_search(session, top_k)
+        if result.vectors:
+            vector_results = await _vector_search(result.vectors[0], session, search_depth)
+        else:
+            logger.warning(
+                "No query embeddings (%s); trying keyword-only retrieval before non-query fallback",
+                result.error or "vectors absent",
+            )
+            keyword_only: list[dict] = []
+            if keyword_enabled:
+                keyword_only = await _keyword_search(query, session, search_depth)
+            if keyword_only:
+                deduped = _deduplicate_chunks(keyword_only, dedup_threshold)
+                final = _apply_diversity(
+                    deduped,
+                    top_k,
+                    max_per_doc,
+                    diversity_min,
+                    diversity_relevance_threshold,
+                )
+                kw_doc_counts: dict[str, int] = defaultdict(int)
+                for chunk in final:
+                    kw_doc_counts[chunk["source_document"]] += 1
+                logger.info(
+                    "Embedding-less retrieval: keyword-only -> %d chunks, doc distribution: %s",
+                    len(final),
+                    dict(kw_doc_counts),
+                )
+                return final
+
+            logger.error(
+                "Embeddings unavailable and keyword search returned no hits — "
+                "using recent chunks (identical for all queries). Fix embedding service or corpus."
+            )
+            return await _fallback_search(session, top_k)
 
     # Keyword search (graceful degradation: returns [] if not supported)
     keyword_results = []
