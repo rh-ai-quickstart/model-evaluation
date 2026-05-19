@@ -191,10 +191,28 @@ from the expected answer are not omitted. \
 Given the expected answer, check whether the context chunks that actually \
 contain the needed information appear before irrelevant ones. \
 1.0 = perfectly ranked; 0.0 = relevant chunks buried or absent.
+{concept_section}
+Respond with ONLY a JSON object containing the four scores{concept_response_hint}. No other text.
+Example: {{{concept_example}}}"""
 
-Respond with ONLY a JSON object containing the four scores. No other text.
-Example: {{"completeness": 0.80, "correctness": 0.90, "compliance_accuracy": 0.85, \
-"context_precision": 0.75}}"""
+_CONCEPT_SECTION = """
+Additionally, check coverage of these REQUIRED CONCEPTS against the ANSWER. \
+For each concept, respond with "covered" if the answer addresses it, or \
+"missing" if it does not.
+
+REQUIRED CONCEPTS:
+{concepts_json}
+"""
+
+_CONCEPT_EXAMPLE_WITH = (
+    '"completeness": 0.80, "correctness": 0.90, "compliance_accuracy": 0.85, '
+    '"context_precision": 0.75, '
+    '"concept_coverage": ["covered", "missing", "covered"]'
+)
+_CONCEPT_EXAMPLE_WITHOUT = (
+    '"completeness": 0.80, "correctness": 0.90, "compliance_accuracy": 0.85, '
+    '"context_precision": 0.75'
+)
 
 
 def _parse_scores(raw: str, expected_keys: list[str]) -> dict[str, float | None]:
@@ -247,6 +265,44 @@ def _clamp_score(value) -> float | None:
         return None
 
 
+def _parse_concept_coverage(raw: str, expected_count: int) -> list[str] | None:
+    """Extract concept_coverage array from judge response."""
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict) and "concept_coverage" in parsed:
+            arr = parsed["concept_coverage"]
+            if isinstance(arr, list):
+                statuses = []
+                for s in arr:
+                    val = str(s).strip().lower() if s else "missing"
+                    statuses.append(val if val in ("covered", "missing") else "missing")
+                while len(statuses) < expected_count:
+                    statuses.append("missing")
+                return statuses[:expected_count]
+    except json.JSONDecodeError:
+        pass
+
+    m = re.search(r'"concept_coverage"\s*:\s*\[([^\]]*)\]', text, re.IGNORECASE)
+    if m:
+        items = re.findall(r'"(covered|missing)"', m.group(1), re.IGNORECASE)
+        if items:
+            statuses = [s.lower() for s in items]
+            while len(statuses) < expected_count:
+                statuses.append("missing")
+            return statuses[:expected_count]
+
+    return None
+
+
 async def _run_prompt_a(
     judge: MaaSJudgeModel,
     question: str,
@@ -282,14 +338,34 @@ async def _run_prompt_b(
     answer: str,
     expected_answer: str,
     contexts: list[str],
-) -> dict[str, float | None]:
-    """Run consolidated Prompt B: completeness, correctness, compliance_accuracy, context_precision."""
+    concepts: list[str] | None = None,
+) -> tuple[dict[str, float | None], list[str] | None]:
+    """Run consolidated Prompt B with optional concept coverage.
+
+    Returns:
+        Tuple of (scores dict, concept_statuses list or None).
+        concept_statuses is a list of "covered"/"missing" matching the
+        concepts order, or None if concepts were not provided or parsing failed.
+    """
     contexts_str = "\n---\n".join(contexts) if contexts else "(no context provided)"
+
+    if concepts:
+        concept_section = _CONCEPT_SECTION.format(concepts_json=json.dumps(concepts))
+        concept_response_hint = ' and the concept_coverage array'
+        concept_example = _CONCEPT_EXAMPLE_WITH
+    else:
+        concept_section = ""
+        concept_response_hint = ""
+        concept_example = _CONCEPT_EXAMPLE_WITHOUT
+
     prompt = _PROMPT_B.format(
         question=question,
         answer=answer,
         expected_answer=expected_answer,
         contexts=contexts_str,
+        concept_section=concept_section,
+        concept_response_hint=concept_response_hint,
+        concept_example=concept_example,
     )
     try:
         raw = await judge.a_generate(prompt)
@@ -297,7 +373,10 @@ async def _run_prompt_b(
             raw,
             ["completeness", "correctness", "compliance_accuracy", "context_precision"],
         )
-        return scores
+        concept_statuses = None
+        if concepts:
+            concept_statuses = _parse_concept_coverage(raw, len(concepts))
+        return scores, concept_statuses
     except Exception as e:
         logger.error("Prompt B scoring failed: %s", e, exc_info=True)
         return {
@@ -305,7 +384,7 @@ async def _run_prompt_b(
             "correctness": None,
             "compliance_accuracy": None,
             "context_precision": None,
-        }
+        }, None
 
 
 # ---------------------------------------------------------------------------
@@ -424,15 +503,18 @@ async def score_result(
     expected_answer: str | None = None,
     *,
     evaluated_model_name: str = "",
+    required_concepts: list[str] | None = None,
 ) -> dict:
     """Score a single RAG response using consolidated judge prompts.
 
     Runs two prompts concurrently:
     - Prompt A (always): faithfulness, relevancy, context_relevancy, abstention
     - Prompt B (when expected_answer provided): completeness, correctness,
-      compliance_accuracy, context_precision
+      compliance_accuracy, context_precision, and optional concept coverage
 
-    Reduces judge calls from 8 to at most 2 per question.
+    When ``required_concepts`` is provided, Prompt B also evaluates which
+    concepts the answer covers, returning a ``coverage_gaps`` dict in the
+    result. This eliminates the separate coverage LLM call.
 
     Args:
         question: The input question.
@@ -441,9 +523,13 @@ async def score_result(
         expected_answer: Optional ground truth answer.
         evaluated_model_name: Model under test; used as the judge LLM when no
             JUDGE_MODEL_NAME / MODEL_A_NAME / MODEL_B_NAME is configured.
+        required_concepts: Optional list of concepts to check coverage for.
+            When provided alongside expected_answer, Prompt B includes
+            concept coverage evaluation.
 
     Returns:
-        Dict with metric scores and is_hallucination flag.
+        Dict with metric scores, is_hallucination flag, and optionally
+        coverage_gaps dict.
     """
     if not settings.API_TOKEN:
         logger.warning("No API token for judge model, skipping scoring")
@@ -460,15 +546,19 @@ async def score_result(
     judge = _get_judge_model(judge_model_name)
 
     scores: dict = {}
+    concept_statuses: list[str] | None = None
 
     if expected_answer:
-        prompt_a_result, prompt_b_result = await asyncio.gather(
+        prompt_a_result, (prompt_b_scores, concept_statuses) = await asyncio.gather(
             _run_prompt_a(judge, question, answer, contexts),
-            _run_prompt_b(judge, question, answer, expected_answer, contexts),
+            _run_prompt_b(
+                judge, question, answer, expected_answer, contexts,
+                concepts=required_concepts,
+            ),
         )
     else:
         prompt_a_result = await _run_prompt_a(judge, question, answer, contexts)
-        prompt_b_result = None
+        prompt_b_scores = None
 
     # Map prompt A results to canonical score keys
     scores["groundedness_score"] = prompt_a_result.get("faithfulness")
@@ -477,16 +567,46 @@ async def score_result(
     scores["abstention_score"] = prompt_a_result.get("abstention_quality")
 
     # Map prompt B results when available
-    if prompt_b_result:
-        scores["completeness_score"] = prompt_b_result.get("completeness")
-        scores["correctness_score"] = prompt_b_result.get("correctness")
-        scores["compliance_accuracy_score"] = prompt_b_result.get("compliance_accuracy")
-        scores["context_precision_score"] = prompt_b_result.get("context_precision")
+    if prompt_b_scores:
+        scores["completeness_score"] = prompt_b_scores.get("completeness")
+        scores["correctness_score"] = prompt_b_scores.get("correctness")
+        scores["compliance_accuracy_score"] = prompt_b_scores.get("compliance_accuracy")
+        scores["context_precision_score"] = prompt_b_scores.get("context_precision")
 
     groundedness = scores.get("groundedness_score")
     if groundedness is not None:
         scores["is_hallucination"] = groundedness < HALLUCINATION_THRESHOLD
     else:
         scores["is_hallucination"] = None
+
+    # Build coverage_gaps from concept statuses
+    if required_concepts and concept_statuses:
+        covered = [
+            c for c, s in zip(required_concepts, concept_statuses) if s == "covered"
+        ]
+        missing = [
+            c for c, s in zip(required_concepts, concept_statuses) if s == "missing"
+        ]
+        coverage_gaps: dict = {
+            "concepts": required_concepts,
+            "covered": covered,
+            "missing": missing,
+            "coverage_ratio": len(covered) / len(required_concepts),
+        }
+        # Classify missing concepts as retrieval vs generation failures
+        if contexts and missing:
+            from .coverage import _check_concept_in_contexts
+
+            retrieval_failures = []
+            generation_failures = []
+            for concept in missing:
+                if _check_concept_in_contexts(concept, contexts):
+                    generation_failures.append(concept)
+                else:
+                    retrieval_failures.append(concept)
+            coverage_gaps["retrieval_failures"] = retrieval_failures
+            coverage_gaps["generation_failures"] = generation_failures
+
+        scores["coverage_gaps"] = coverage_gaps
 
     return scores

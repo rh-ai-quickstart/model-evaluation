@@ -293,7 +293,9 @@ function InlineDeterministicChecks({
                 const isChunkAlignmentInfo =
                     check.check_name === 'chunk_alignment' && !check.passed && isGroundedTruth;
                 const hasSupportingWarning =
-                    check.passed && check.detail?.toLowerCase().includes('supporting documents');
+                    check.passed &&
+                    check.detail?.toLowerCase().includes('missing') &&
+                    check.detail?.toLowerCase().includes('supporting');
                 const Icon = isChunkAlignmentInfo
                     ? Info
                     : check.passed

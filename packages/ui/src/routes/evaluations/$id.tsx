@@ -384,7 +384,8 @@ function ResultRow({ result }: { result: EvalResult }) {
                                         isGroundedTruth;
                                     const hasSupportingWarning =
                                         check.passed &&
-                                        check.detail?.toLowerCase().includes('supporting documents');
+                                        check.detail?.toLowerCase().includes('missing') &&
+                                        check.detail?.toLowerCase().includes('supporting');
                                     const Icon = isChunkAlignmentInfo
                                         ? Info
                                         : check.passed
