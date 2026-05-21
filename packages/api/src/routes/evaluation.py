@@ -31,10 +31,10 @@ from ..schemas.evaluation import (
     SynthesizeResponse,
 )
 from ..services.deterministic_checks import run_deterministic_checks
+from ..services.embedding import QUERY_PREFIX, generate_embeddings
 from ..services.generation import generate_answer
 from ..services.profiles import EvalProfile, list_profiles, load_profile
 from ..services.query_decomposition import decompose_query
-from ..services.embedding import QUERY_PREFIX, generate_embeddings
 from ..services.retrieval import _apply_diversity, _deduplicate_chunks, retrieve_chunks
 from ..services.scoring import compute_chunk_alignment, score_result
 from ..services.synthesizer import generate_questions
@@ -957,29 +957,6 @@ def _compare_metric(
     return ComparisonMetric(metric=name, run_a=val_a, run_b=val_b, winner=winner)
 
 
-def _deterministic_pass_rate(results: dict[str, EvalResult], check_name: str) -> float | None:
-    """Compute the pass rate for a deterministic check across question results.
-
-    Args:
-        results: Dict of question text -> EvalResult.
-        check_name: Name of the deterministic check to aggregate.
-
-    Returns:
-        Pass rate as a float (0.0-1.0), or None if no results have the check.
-    """
-    total = 0
-    passed = 0
-    for r in results.values():
-        if not r.deterministic_checks:
-            continue
-        for check in r.deterministic_checks:
-            if check.get("check_name") == check_name:
-                total += 1
-                if check.get("passed"):
-                    passed += 1
-                break
-    return passed / total if total > 0 else None
-
 
 def _load_comparison_profile(run_a: EvalRun, run_b: EvalRun) -> EvalProfile | None:
     """Try to load a profile for comparison gates.
@@ -1030,7 +1007,6 @@ async def compare_eval_runs(
             "compliance_accuracy", run_a.avg_compliance_accuracy, run_b.avg_compliance_accuracy
         ),
         _compare_metric("abstention", run_a.avg_abstention, run_b.avg_abstention),
-        _compare_metric("chunk_alignment", run_a.avg_chunk_alignment, run_b.avg_chunk_alignment),
         _compare_metric(
             "hallucination_rate",
             run_a.hallucination_rate,
@@ -1051,12 +1027,6 @@ async def compare_eval_runs(
 
     a_by_question = {r.question: r for r in results_a.scalars().all()}
     b_by_question = {r.question: r for r in results_b.scalars().all()}
-
-    # Add deterministic check pass rates as comparison metrics
-    for check_name in ("document_presence", "chunk_alignment"):
-        rate_a = _deterministic_pass_rate(a_by_question, check_name)
-        rate_b = _deterministic_pass_rate(b_by_question, check_name)
-        metrics.append(_compare_metric(f"{check_name}_pass_rate", rate_a, rate_b))
 
     # Build expected_answer lookup from question sets (fallback for old results)
     expected_by_question: dict[str, str] = {}

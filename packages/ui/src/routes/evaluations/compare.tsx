@@ -45,11 +45,8 @@ const METRIC_LABELS: Record<string, string> = {
     correctness: 'Correctness',
     compliance_accuracy: 'Compliance Accuracy',
     abstention: 'Abstention Quality',
-    chunk_alignment: 'Chunk Alignment',
     hallucination_rate: 'Hallucination Rate',
     latency_ms: 'Avg Latency',
-    document_presence_pass_rate: 'Document Presence Pass Rate',
-    chunk_alignment_pass_rate: 'Chunk Alignment Pass Rate',
 };
 
 const METRIC_TOOLTIPS: Record<string, string> = {
@@ -61,13 +58,8 @@ const METRIC_TOOLTIPS: Record<string, string> = {
     correctness: 'Is the answer factually consistent with the expected answer?',
     compliance_accuracy: 'Are domain-specific obligations, thresholds, and cited authorities correct and complete?',
     abstention: 'When context is insufficient, does the model say so instead of guessing?',
-    chunk_alignment: 'How many expected chunk references were retrieved for each question.',
     hallucination_rate: 'Percentage of answers containing claims not supported by the retrieved context. Lower is better.',
     latency_ms: 'Average time to generate an answer. Lower is better.',
-    document_presence_pass_rate:
-        'Share of questions where all required documents were represented in retrieved context.',
-    chunk_alignment_pass_rate:
-        'Share of questions where expected chunk alignment passed the deterministic threshold.',
 };
 
 interface ComparisonHistoryEntry {

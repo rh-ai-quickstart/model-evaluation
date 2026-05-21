@@ -131,7 +131,6 @@ Makefile                               Top-level workflow commands
 - [`packages/ui/README.md`](packages/ui/README.md)
 - [`packages/api/README.md`](packages/api/README.md)
 - [`packages/db/README.md`](packages/db/README.md)
-- [`deploy/helm/ai-quickstart-template/README.md`](deploy/helm/ai-quickstart-template/README.md)
 
 ## Notes
 
