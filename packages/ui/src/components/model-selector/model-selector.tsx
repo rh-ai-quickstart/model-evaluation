@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useModels } from '../../hooks/models';
 import { Server, ChevronDown, Check } from 'lucide-react';
 import type { Model } from '../../schemas/models';
+import { Skeleton } from '../atoms/skeleton/skeleton';
 
 interface ModelSelectorProps {
     selectedModelId: number | null;
@@ -43,7 +44,11 @@ export function ModelSelector({ selectedModelId, onSelect, label }: ModelSelecto
             >
                 <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedModel?.name ?? (isLoading ? 'Loading...' : 'Select a model')}</span>
+                    {isLoading ? (
+                        <Skeleton className="h-4 w-24" />
+                    ) : (
+                        <span>{selectedModel?.name ?? 'Select a model'}</span>
+                    )}
                 </div>
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>

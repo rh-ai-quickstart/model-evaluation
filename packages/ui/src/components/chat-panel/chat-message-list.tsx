@@ -30,7 +30,7 @@ export function ChatMessageList({ messages, modelName, onSuggestedClick }: ChatM
                 <div className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-primary/10">
                     <Bot className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold">Hi! I'm your FSI Compliance Assistant.</h3>
+                <h3 className="text-lg font-semibold">Hi! I&apos;m your FSI Compliance Assistant.</h3>
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">
                     {modelName
                         ? `I'm powered by ${modelName} to help you with compliance questions based on your uploaded documents.`

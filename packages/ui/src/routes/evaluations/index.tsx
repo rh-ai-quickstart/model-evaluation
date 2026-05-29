@@ -36,6 +36,27 @@ import type { EvalRun } from '../../schemas/evaluation';
 import type { EvalQuestionInput } from '../../services/evaluation';
 import { formatScore, formatLatency, formatUtcDate } from '../../lib/format';
 import { EVAL_STATUS_COLORS } from '../../lib/status-colors';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '../../components/atoms/select/select';
+import { Skeleton } from '../../components/atoms/skeleton/skeleton';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '../../components/atoms/alert-dialog/alert-dialog';
+import { buttonVariants } from '../../components/atoms/button/button';
+import { cn } from '../../lib/utils';
 
 export const Route = createFileRoute('/evaluations/')({
     component: EvaluationsPage,
@@ -113,30 +134,64 @@ function RunRow({
                             Cancelling...
                         </span>
                     ) : (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm('Cancel this evaluation run?\n\nPartial results will appear once the current question finishes processing.')) {
-                                    onCancel(run.id);
-                                }
-                            }}
-                            className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
-                        >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Cancel
-                        </button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <button
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                                >
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    Cancel
+                                </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Cancel evaluation run?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Partial results will appear once the current question finishes processing.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Keep Running</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        className={cn(buttonVariants({ variant: 'destructive' }), 'text-white')}
+                                        onClick={() => onCancel(run.id)}
+                                    >
+                                        Cancel Evaluation
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     )
                 )}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(run.id);
-                    }}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    title="Delete evaluation run"
-                >
-                    <Trash2 className="h-4 w-4" />
-                </button>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete evaluation run"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete evaluation run?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will permanently delete Run #{run.id} ({run.model_name}) and all its results.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                className={cn(buttonVariants({ variant: 'destructive' }), 'text-white')}
+                                onClick={() => onDelete(run.id)}
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );
@@ -310,18 +365,19 @@ function NewEvalForm({
         }
     };
 
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
     const handleDeleteActiveSet = () => {
         if (!activeSetId) return;
-        if (window.confirm(`Delete question set "${activeSetName}"? This will also delete all evaluation runs linked to this set.`)) {
-            deleteSetMutation.mutate(activeSetId, {
-                onSuccess: () => {
-                    setActiveSetId(undefined);
-                    setActiveSetName('');
-                    setQuestions([]);
-                    setLastSavedAt(undefined);
-                },
-            });
-        }
+        deleteSetMutation.mutate(activeSetId, {
+            onSuccess: () => {
+                setActiveSetId(undefined);
+                setActiveSetName('');
+                setQuestions([]);
+                setLastSavedAt(undefined);
+                setShowDeleteDialog(false);
+            },
+        });
     };
 
     const handleSynthesize = () => {
@@ -407,18 +463,18 @@ function NewEvalForm({
                     <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                         Model
                     </label>
-                    <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                    >
-                        <option value="">Select a model</option>
-                        {models?.map((m) => (
-                            <option key={m.id} value={m.name}>
-                                {m.name} ({m.deployment_mode})
-                            </option>
-                        ))}
-                    </select>
+                    <Select value={selectedModel || undefined} onValueChange={setSelectedModel}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {models?.map((m) => (
+                                <SelectItem key={m.id} value={m.name}>
+                                    {m.name} ({m.deployment_mode})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {profiles && profiles.length > 0 && (
@@ -426,18 +482,22 @@ function NewEvalForm({
                         <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                             Evaluation Profile
                         </label>
-                        <select
-                            value={selectedProfile}
-                            onChange={(e) => setSelectedProfile(e.target.value)}
-                            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                        <Select
+                            value={selectedProfile || '__none__'}
+                            onValueChange={(v) => setSelectedProfile(v === '__none__' ? '' : v)}
                         >
-                            <option value="">No profile (raw metric comparison)</option>
-                            {profiles.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {p.id} -- {p.description || p.domain}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="No profile (raw metric comparison)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__none__">No profile (raw metric comparison)</SelectItem>
+                                {profiles.map((p) => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                        {p.id} -- {p.description || p.domain}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <p className="mt-1 text-xs text-muted-foreground">
                             Profiles define pass/fail thresholds and disqualification gates for comparison verdicts.
                         </p>
@@ -459,18 +519,22 @@ function NewEvalForm({
                     <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                         Question Set
                     </label>
-                    <select
-                        value={activeSetId ?? ''}
-                        onChange={(e) => handleSelectSet(e.target.value)}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                    <Select
+                        value={activeSetId != null ? String(activeSetId) : '__new__'}
+                        onValueChange={(v) => handleSelectSet(v === '__new__' ? '' : v)}
                     >
-                        <option value="">New question set</option>
-                        {questionSets?.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.name} ({s.questions.length}q)
-                            </option>
-                        ))}
-                    </select>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="New question set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__new__">New question set</SelectItem>
+                            {questionSets?.map((s) => (
+                                <SelectItem key={s.id} value={String(s.id)}>
+                                    {s.name} ({s.questions.length}q)
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     {activeSetId && (
                         <div className="mt-2 flex items-center gap-2">
@@ -498,13 +562,33 @@ function NewEvalForm({
                                 isSaving={isSaving}
                                 hasError={saveHasError}
                             />
-                            <button
-                                onClick={handleDeleteActiveSet}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                title="Delete question set"
-                            >
-                                <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                                <AlertDialogTrigger asChild>
+                                    <button
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                        title="Delete question set"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete question set?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will delete &ldquo;{activeSetName}&rdquo; and all evaluation runs linked to it.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            className={cn(buttonVariants({ variant: 'destructive' }), 'text-white')}
+                                            onClick={handleDeleteActiveSet}
+                                        >
+                                            Delete
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                     )}
                 </div>
@@ -883,7 +967,24 @@ function EvaluationsPage() {
                 )}
 
                 {isLoading && (
-                    <p className="text-sm text-muted-foreground">Loading evaluations...</p>
+                    <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="flex items-center gap-2 rounded-lg border p-4">
+                                <div className="flex flex-1 flex-col gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-5 w-16 rounded-full" />
+                                    </div>
+                                    <Skeleton className="h-3 w-48" />
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <Skeleton className="h-8 w-10" />
+                                    <Skeleton className="h-8 w-10" />
+                                    <Skeleton className="h-8 w-12" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
                 {error && <p className="text-sm text-destructive">{error.message}</p>}
 
