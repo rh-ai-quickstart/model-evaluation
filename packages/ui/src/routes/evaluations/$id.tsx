@@ -19,6 +19,14 @@ import type { EvalResult, CoverageGaps } from '../../schemas/evaluation';
 import { formatScore, formatLatency, formatUtcDate } from '../../lib/format';
 import { EVAL_STATUS_COLORS } from '../../lib/status-colors';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '../../components/atoms/select/select';
+import { Skeleton } from '../../components/atoms/skeleton/skeleton';
+import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -589,8 +597,31 @@ function EvalRunDetailPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center p-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="p-4 sm:p-6 lg:p-8">
+                <div className="mx-auto max-w-5xl">
+                    <Skeleton className="mb-4 h-4 w-36" />
+                    <div className="mb-6 flex items-start justify-between">
+                        <div>
+                            <Skeleton className="mb-2 h-7 w-64" />
+                            <Skeleton className="h-4 w-40" />
+                        </div>
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="rounded-lg border bg-card p-3">
+                                <Skeleton className="mb-2 h-3 w-20" />
+                                <Skeleton className="h-6 w-14" />
+                            </div>
+                        ))}
+                    </div>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="mb-3 rounded-lg border p-4">
+                            <Skeleton className="mb-2 h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -731,18 +762,18 @@ function EvalRunDetailPage() {
                         </h3>
                         <div className="flex items-end gap-3">
                             <div className="flex-1">
-                                <select
-                                    value={rerunModel}
-                                    onChange={(e) => setRerunModel(e.target.value)}
-                                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                                >
-                                    <option value="">Select a model</option>
-                                    {models?.map((m) => (
-                                        <option key={m.id} value={m.name}>
-                                            {m.name} ({m.deployment_mode})
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select value={rerunModel || undefined} onValueChange={setRerunModel}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select a model" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {models?.map((m) => (
+                                            <SelectItem key={m.id} value={m.name}>
+                                                {m.name} ({m.deployment_mode})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <button
                                 onClick={handleRerun}

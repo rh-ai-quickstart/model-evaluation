@@ -11,6 +11,7 @@ import {
     usePendingDocumentIngestions,
 } from '../../hooks/documents';
 import { FileText, Upload, Trash2, Loader2, AlertCircle, Link, RotateCcw } from 'lucide-react';
+import { Skeleton } from '../../components/atoms/skeleton/skeleton';
 import type { DocumentResponse } from '../../schemas/documents';
 import { DOC_STATUS_COLORS } from '../../lib/status-colors';
 import { formatUtcDate } from '../../lib/format';
@@ -360,7 +361,20 @@ function DocumentsPage() {
                 )}
 
                 {isLoading && (
-                    <p className="text-sm text-muted-foreground">Loading documents...</p>
+                    <div className="space-y-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="flex items-center gap-3">
+                                    <Skeleton className="h-5 w-5 rounded" />
+                                    <div className="flex flex-col gap-1">
+                                        <Skeleton className="h-4 w-48" />
+                                        <Skeleton className="h-3 w-32" />
+                                    </div>
+                                </div>
+                                <Skeleton className="h-8 w-8 rounded-lg" />
+                            </div>
+                        ))}
+                    </div>
                 )}
                 {error && <p className="text-sm text-destructive">{error.message}</p>}
 

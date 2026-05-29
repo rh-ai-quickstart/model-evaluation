@@ -5,7 +5,6 @@ import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useCompareEvalRuns, useEvalRuns } from '../../hooks/evaluation';
 import {
     ArrowLeft,
-    Loader2,
     Trophy,
     Minus,
     GitCompareArrows,
@@ -22,6 +21,14 @@ import {
 import { useDocuments } from '../../hooks/documents';
 import type { ComparisonMetric, ComparisonResponse, CoverageGaps, EvalResult, EvalRun } from '../../schemas/evaluation';
 import { formatScore, formatLatency, formatMetricValue } from '../../lib/format';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '../../components/atoms/select/select';
+import { Skeleton } from '../../components/atoms/skeleton/skeleton';
 
 interface CompareSearch {
     run_a: number;
@@ -787,36 +794,42 @@ function CompareSelector() {
                         <label className="mb-1 block text-xs text-muted-foreground">
                             Baseline Run
                         </label>
-                        <select
-                            value={runA}
-                            onChange={(e) => setRunA(Number(e.target.value))}
-                            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                        <Select
+                            value={runA ? String(runA) : undefined}
+                            onValueChange={(v) => setRunA(Number(v))}
                         >
-                            <option value={0}>Select run</option>
-                            {completedRuns.map((r: EvalRun) => (
-                                <option key={r.id} value={r.id}>
-                                    #{r.id} - {r.model_name}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select run" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {completedRuns.map((r: EvalRun) => (
+                                    <SelectItem key={r.id} value={String(r.id)}>
+                                        #{r.id} - {r.model_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <span className="pb-2 text-sm text-muted-foreground">vs</span>
                     <div className="flex-1">
                         <label className="mb-1 block text-xs text-muted-foreground">
                             Candidate Run
                         </label>
-                        <select
-                            value={runB}
-                            onChange={(e) => setRunB(Number(e.target.value))}
-                            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                        <Select
+                            value={runB ? String(runB) : undefined}
+                            onValueChange={(v) => setRunB(Number(v))}
                         >
-                            <option value={0}>Select run</option>
-                            {completedRuns.map((r: EvalRun) => (
-                                <option key={r.id} value={r.id}>
-                                    #{r.id} - {r.model_name}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select run" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {completedRuns.map((r: EvalRun) => (
+                                    <SelectItem key={r.id} value={String(r.id)}>
+                                        #{r.id} - {r.model_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <button
                         onClick={() =>
@@ -870,8 +883,31 @@ function ComparePage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center p-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="p-4 sm:p-6 lg:p-8">
+                <div className="mx-auto max-w-5xl">
+                    <Skeleton className="mb-4 h-4 w-32" />
+                    <div className="mb-6 rounded-xl border bg-muted/30 p-6">
+                        <Skeleton className="mb-3 h-6 w-40" />
+                        <Skeleton className="mb-2 h-9 w-72" />
+                        <Skeleton className="h-4 w-full max-w-md" />
+                    </div>
+                    <div className="mb-8 rounded-xl border bg-card p-6">
+                        <Skeleton className="mb-3 h-5 w-36" />
+                        <Skeleton className="h-10 w-full rounded-lg" />
+                    </div>
+                    <div className="space-y-2">
+                        {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="flex items-center rounded-lg border p-3">
+                                <Skeleton className="h-4 w-28" />
+                                <div className="flex flex-1 items-center justify-center gap-8">
+                                    <Skeleton className="h-8 w-16" />
+                                    <Skeleton className="h-4 w-6" />
+                                    <Skeleton className="h-8 w-16" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
