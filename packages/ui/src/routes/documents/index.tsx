@@ -11,6 +11,7 @@ import {
     usePendingDocumentIngestions,
 } from '../../hooks/documents';
 import { FileText, Upload, Trash2, Loader2, AlertCircle, Link, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import { Skeleton } from '../../components/atoms/skeleton/skeleton';
 import type { DocumentResponse } from '../../schemas/documents';
 import { DOC_STATUS_COLORS } from '../../lib/status-colors';
@@ -146,9 +147,16 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
             return;
         }
         uploadMutation.mutate(file, {
-            onSuccess: () => {
+            onSuccess: (data) => {
                 onUploaded();
                 if (fileInputRef.current) fileInputRef.current.value = '';
+                toast.success(data.message);
+                if (data.embedding_error) {
+                    toast.warning(data.embedding_error);
+                }
+            },
+            onError: (err) => {
+                toast.error(err.message);
             },
         });
     };
@@ -164,9 +172,16 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         e.preventDefault();
         if (!url.trim()) return;
         urlMutation.mutate(url.trim(), {
-            onSuccess: () => {
+            onSuccess: (data) => {
                 onUploaded();
                 setUrl('');
+                toast.success(data.message);
+                if (data.embedding_error) {
+                    toast.warning(data.embedding_error);
+                }
+            },
+            onError: (err) => {
+                toast.error(err.message);
             },
         });
     };
@@ -282,28 +297,6 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
                 </div>
             )}
 
-            {activeMutation.isSuccess && (
-                <div className="mt-3 space-y-2 text-sm">
-                    <p
-                        className={
-                            activeMutation.data.embedding_error
-                                ? 'text-amber-700 dark:text-amber-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                        }
-                    >
-                        {activeMutation.data.message}
-                    </p>
-                    {activeMutation.data.embedding_error && (
-                        <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive">
-                            {activeMutation.data.embedding_error}
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {activeMutation.error && (
-                <p className="mt-3 text-sm text-destructive">{activeMutation.error.message}</p>
-            )}
         </div>
     );
 }
@@ -320,6 +313,8 @@ function DocumentsPage() {
     const handleDelete = (id: number) => {
         setDeletingId(id);
         deleteMutation.mutate(id, {
+            onSuccess: () => toast.success('Document deleted'),
+            onError: (err) => toast.error(err.message),
             onSettled: () => setDeletingId(null),
         });
     };
@@ -327,6 +322,8 @@ function DocumentsPage() {
     const handleRetryEmbed = (id: number) => {
         setRetryingId(id);
         retryMutation.mutate(id, {
+            onSuccess: () => toast.success('Embedding retry started'),
+            onError: (err) => toast.error(err.message),
             onSettled: () => setRetryingId(null),
         });
     };

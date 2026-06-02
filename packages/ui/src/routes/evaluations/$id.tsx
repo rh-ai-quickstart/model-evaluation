@@ -26,6 +26,7 @@ import {
     SelectValue,
 } from '../../components/atoms/select/select';
 import { Skeleton } from '../../components/atoms/skeleton/skeleton';
+import { toast } from 'sonner';
 import {
     Tooltip,
     TooltipContent,
@@ -640,7 +641,11 @@ function EvalRunDetailPage() {
             { evalRunId: runId, modelName: rerunModel },
             {
                 onSuccess: (data) => {
+                    toast.success('Evaluation started');
                     navigate({ to: '/evaluations/$id', params: { id: String(data.eval_run_id) } });
+                },
+                onError: (err) => {
+                    toast.error(err.message);
                 },
             },
         );
