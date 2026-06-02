@@ -18,6 +18,7 @@ import {
     useUpdateQuestionSet,
     useDeleteQuestionSet,
 } from '../../hooks/question-sets';
+import { toast } from 'sonner';
 import {
     BarChart3,
     Plus,
@@ -25,7 +26,6 @@ import {
     Sparkles,
     ArrowRight,
     Loader2,
-    AlertTriangle,
     XCircle,
     FileText,
     CheckCircle2,
@@ -260,7 +260,6 @@ function NewEvalForm({
     const [selectedModel, setSelectedModel] = useState('');
     const [selectedProfile, setSelectedProfile] = useState('');
     const [questions, setQuestions] = useState<EvalQuestionInput[]>(initialQuestions ?? []);
-    const [warningMessage, setWarningMessage] = useState('');
     const [activeSetId, setActiveSetId] = useState<number | undefined>(initialQuestionSetId);
     const [activeSetName, setActiveSetName] = useState('');
     const [isEditingName, setIsEditingName] = useState(false);
@@ -376,6 +375,10 @@ function NewEvalForm({
                 setQuestions([]);
                 setLastSavedAt(undefined);
                 setShowDeleteDialog(false);
+                toast.success('Question set deleted');
+            },
+            onError: (err) => {
+                toast.error(err.message);
             },
         });
     };
@@ -398,6 +401,9 @@ function NewEvalForm({
                         updateQuestions(merged);
                     }
                 },
+                onError: (err) => {
+                    toast.error(err.message);
+                },
             },
         );
     };
@@ -413,11 +419,16 @@ function NewEvalForm({
                 {
                     onSuccess: (data) => {
                         if (data.message.includes('Warning')) {
-                            setWarningMessage(data.message);
+                            toast.warning(data.message);
+                        } else {
+                            toast.success('Evaluation started');
                         }
                         setQuestions([]);
                         setSelectedModel('');
                         onCreated();
+                    },
+                    onError: (err) => {
+                        toast.error(err.message);
                     },
                 },
             );
@@ -706,20 +717,6 @@ function NewEvalForm({
                 </div>
             </div>
 
-            {synthesizeMutation.error && (
-                <p className="mt-4 text-sm text-destructive">{synthesizeMutation.error.message}</p>
-            )}
-
-            {createMutation.error && (
-                <p className="mt-4 text-sm text-destructive">{createMutation.error.message}</p>
-            )}
-
-            {warningMessage && (
-                <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <p className="text-xs text-amber-700 dark:text-amber-300">{warningMessage}</p>
-                </div>
-            )}
         </div>
     );
 }
@@ -957,9 +954,15 @@ function EvaluationsPage() {
                                     isCancelling={cancellingIds.has(run.id)}
                                     onCancel={(id) => {
                                         setCancellingIds((prev) => new Set(prev).add(id));
-                                        cancelMutation.mutate(id);
+                                        cancelMutation.mutate(id, {
+                                            onSuccess: () => toast.success('Evaluation cancelled'),
+                                            onError: (err) => toast.error(err.message),
+                                        });
                                     }}
-                                    onDelete={(id) => deleteMutation.mutate(id)}
+                                    onDelete={(id) => deleteMutation.mutate(id, {
+                                        onSuccess: () => toast.success('Evaluation run deleted'),
+                                        onError: (err) => toast.error(err.message),
+                                    })}
                                 />
                             ))}
                         </div>
