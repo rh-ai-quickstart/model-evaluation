@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { ModelSpecsCard, findModelMetadata } from './model-specs-card';
 
-export function OverviewPanel() {
+export function OverviewPanel({ selectedModelId }: { selectedModelId: number | null }) {
     const { data: runs } = useEvalRuns();
     const { data: documents } = useDocuments();
     const { data: models } = useModels();
@@ -124,16 +124,20 @@ export function OverviewPanel() {
                 </div>
             </div>
 
-            {models && models.length >= 2 && metadataResponse?.available && (
-                <div className="mt-3 flex min-h-0 flex-1 flex-col">
-                    <ModelSpecsCard
-                        modelAName={models[0].name}
-                        modelBName={models[1].name}
-                        metaA={findModelMetadata(metadataResponse?.models, models[0].name)}
-                        metaB={findModelMetadata(metadataResponse?.models, models[1].name)}
-                    />
-                </div>
-            )}
+            {models && models.length >= 2 && metadataResponse?.available && (() => {
+                const currentModel = models.find((m) => m.id === selectedModelId) ?? models[0];
+                const otherModel = models.find((m) => m.id !== currentModel.id) ?? models[1];
+                return (
+                    <div className="mt-3 flex min-h-0 flex-1 flex-col">
+                        <ModelSpecsCard
+                            modelAName={currentModel.name}
+                            modelBName={otherModel.name}
+                            metaA={findModelMetadata(metadataResponse?.models, currentModel.name)}
+                            metaB={findModelMetadata(metadataResponse?.models, otherModel.name)}
+                        />
+                    </div>
+                );
+            })()}
 
         </div>
     );

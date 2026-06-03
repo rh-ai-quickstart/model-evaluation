@@ -11,24 +11,28 @@ import type { Model } from '../../schemas/models';
 
 let nextId = 1;
 
-export function ChatPanel() {
+interface ChatPanelProps {
+    selectedModelId: number | null;
+    onSelectedModelIdChange: (id: number | null) => void;
+}
+
+export function ChatPanel({ selectedModelId, onSelectedModelIdChange }: ChatPanelProps) {
     const { data: models } = useModels();
     const submitQuery = useSubmitQuery();
 
-    const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
     const [messages, setMessages] = useState<ChatMessageEntry[]>([]);
 
     const selectedModel = models?.find((m) => m.id === selectedModelId);
 
     useEffect(() => {
         if (!selectedModelId && models && models.length > 0) {
-            setSelectedModelId(models[0].id);
+            onSelectedModelIdChange(models[0].id);
         }
-    }, [models, selectedModelId]);
+    }, [models, selectedModelId, onSelectedModelIdChange]);
 
     const handleSelectModel = useCallback((model: Model) => {
-        setSelectedModelId(model.id);
-    }, []);
+        onSelectedModelIdChange(model.id);
+    }, [onSelectedModelIdChange]);
 
     const handleNewChat = useCallback(() => {
         setMessages([]);
