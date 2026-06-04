@@ -29,6 +29,12 @@ import {
     SelectValue,
 } from '../../components/atoms/select/select';
 import { Skeleton } from '../../components/atoms/skeleton/skeleton';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '../../components/atoms/tooltip/tooltip';
 
 interface CompareSearch {
     run_a: number;
@@ -179,12 +185,12 @@ function MetricRow({
             <div className="flex w-40 items-center gap-1.5 text-sm font-medium">
                 {METRIC_LABELS[metric.metric] ?? metric.metric}
                 {tooltip && (
-                    <span className="group relative">
-                        <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground/50" />
-                        <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg border bg-popover px-3 py-2 text-xs font-normal text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-                            {tooltip}
-                        </span>
-                    </span>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+                    </Tooltip>
                 )}
             </div>
             <div className="flex flex-1 items-center justify-center gap-8">
@@ -927,6 +933,7 @@ function ComparePage() {
     ).length;
 
     return (
+        <TooltipProvider delayDuration={200}>
         <div className="p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-5xl">
                 <button
@@ -980,5 +987,6 @@ function ComparePage() {
                 </div>
             </div>
         </div>
+        </TooltipProvider>
     );
 }

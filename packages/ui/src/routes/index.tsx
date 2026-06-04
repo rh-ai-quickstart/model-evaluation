@@ -1,6 +1,7 @@
 // This project was developed with assistance from AI tools.
 
 import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
 import { OverviewPanel } from '../components/dashboard/overview-panel';
 import { ChatPanel } from '../components/chat-panel/chat-panel';
 
@@ -10,13 +11,15 @@ export const Route = createFileRoute('/' as any)({
 });
 
 function Index() {
+    const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+
     return (
-        <div className="grid h-[calc(100vh-128px)] grid-cols-1 lg:grid-cols-2">
+        <div className="grid h-[calc(100vh-128px)] grid-cols-1 lg:grid-cols-[3fr_2fr]">
             <div className="border-r overflow-y-auto">
-                <OverviewPanel />
+                <OverviewPanel selectedModelId={selectedModelId} />
             </div>
             <div className="min-h-0">
-                <ChatPanel />
+                <ChatPanel selectedModelId={selectedModelId} onSelectedModelIdChange={setSelectedModelId} />
             </div>
         </div>
     );
