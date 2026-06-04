@@ -1,138 +1,272 @@
 <!-- This project was developed with assistance from AI tools. -->
 
-# OpenShift AI Model Evaluation
+# Evaluate and Compare Models in Financial Services
 
-Evaluate and compare candidate LLMs for RAG workloads with a repeatable, score-driven workflow.  
-This project ingests your domain PDFs, runs evaluation questions through selected models, computes DeepEval-style metrics, and returns a decision-oriented comparison.
+Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
 
-## What It Does
+## Table of Contents
 
-- Builds a document corpus in PostgreSQL + pgvector from uploaded or ingested PDFs.
-- Runs asynchronous evaluation jobs (question by question) against selected models.
-- Scores answer quality and retrieval quality, then computes run-level and comparison verdicts.
-- Supports optional profile-driven thresholds and deterministic checks for stricter domains.
-- Exposes a UI workflow for documents, evaluations, run details, and side-by-side comparisons.
+- [Overview](#overview)
+- [Detailed description](#detailed-description)
+  - [See it in action](#see-it-in-action)
+  - [Architecture diagrams](#architecture-diagrams)
+- [Requirements](#requirements)
+  - [Minimum hardware requirements](#minimum-hardware-requirements)
+  - [Minimum software requirements](#minimum-software-requirements)
+  - [Required user permissions](#required-user-permissions)
+- [Deploy](#deploy)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Validating the deployment](#validating-the-deployment)
+  - [Delete](#delete)
+- [Repository structure](#repository-structure)
+- [References](#references)
+- [Technical details](#technical-details)
+- [Tags](#tags)
 
-## How It Works (End-to-End)
+## Overview
 
-1. Upload documents in the UI (`/documents`) or ingest from URL/S3 via API.
-2. Documents are parsed, chunked, and embedded into pgvector.
-3. Create or synthesize evaluation questions in `/evaluations`.
-4. Start an evaluation run for a model (and optional profile).
-5. For each question, the API retrieves relevant chunks, generates an answer, computes metrics, and stores a result.
-6. Compare two completed runs in `/evaluations/compare` to get metric winners, warnings, and a final decision summary.
+Financial services organizations building RAG applications need to evaluate which LLM best fits their domain before committing to production. This quickstart automates that process: upload your documents, run evaluation questions against multiple models, and compare results using industry-standard metrics -- all without requiring GPUs.
 
-## Architecture
+## Detailed description
 
-| Layer | Technology | Purpose |
-| --- | --- | --- |
-| UI | React 19 + Vite + TanStack Router/Query | Document and evaluation workflow |
-| API | FastAPI | Orchestration for ingestion, retrieval, generation, scoring, and comparison |
-| DB | PostgreSQL + pgvector + SQLAlchemy + Alembic | Persistent corpus, runs, and results |
-| Evaluation | DeepEval-style metrics + deterministic checks + profile verdicts | Model quality assessment |
-| Deploy | Helm (OpenShift) | UI/API/DB deployment with migration job |
-| Monorepo | Turborepo + pnpm + uv | Unified dev/build/test workflows |
+Banks, insurers, and securities firms increasingly use retrieval-augmented generation to answer questions over regulatory filings, compliance documents, and internal knowledge bases. Choosing the wrong model leads to hallucinated answers in high-stakes contexts -- a costly mistake when dealing with SEC filings, FINRA regulations, or client-facing financial advice.
 
-## Local Development
+This quickstart deploys a complete model evaluation workflow on OpenShift AI. Users upload domain-specific PDFs (such as public SEC filings or banking regulations), define evaluation questions, and run automated assessments against candidate models available through OpenShift AI Model-as-a-Service. The system scores each model on faithfulness, answer relevancy, context precision, and hallucination rate, then presents a side-by-side comparison dashboard with clear winner indicators.
+
+The evaluation framework distinguishes between two failure modes that matter in financial services: generator hallucination (where smaller models fabricate answers) and retriever misses (where the chunking strategy fails to surface relevant context). This distinction helps teams make informed decisions about both model selection and RAG pipeline tuning.
+
+### See it in action
+
+<!-- TODO: Add link to Arcade demo or video walkthrough -->
+
+### Architecture diagrams
+
+<!-- TODO: Add architecture diagram to docs/images/architecture-overview.png -->
+
+![Architecture diagram showing data flow from document upload through RAG pipeline to evaluation dashboard](docs/images/architecture-overview.png)
+
+## Requirements
+
+### Minimum hardware requirements
+
+**Application (MaaS mode -- no GPU required):**
+
+| Component | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|-----------|------------|-----------|----------------|--------------|
+| API | 250m | 1000m | 512Mi | 1Gi |
+| UI | 100m | 500m | 128Mi | 256Mi |
+| Database | 100m | 500m | 256Mi | 512Mi |
+| **Total** | **450m** | **2000m** | **896Mi** | **1.75Gi** |
+
+**Storage:** 10Gi persistent volume for PostgreSQL database.
+
+**Self-hosted model serving (optional):** If deploying models on-cluster instead of using MaaS, GPU resources are required. See chart [values.yaml](chart/values.yaml) for `llm-service` configuration. Supported GPUs: NVIDIA A10, A100, L40S, or T4.
+
+### Minimum software requirements
+
+| Software | Version |
+|----------|---------|
+| Red Hat OpenShift | 4.14 or later |
+| Red Hat OpenShift AI | 2.22 or later (for MaaS endpoint) |
+| `oc` CLI | 4.14 or later |
+| `helm` CLI | 3.12 or later |
+
+### Required user permissions
+
+This quickstart can be deployed by any user with:
+
+- Permission to create projects/namespaces
+- Permission to deploy applications via Helm
+- No cluster-admin access required
+
+## Deploy
 
 ### Prerequisites
 
-- Node.js 18+
-- pnpm 9+
-- Python 3.11+
-- uv
-- Podman + podman-compose
+Before deploying, ensure you have:
 
-### Setup
+- Access to a Red Hat OpenShift cluster with OpenShift AI 2.22+ installed
+- `oc` CLI installed and authenticated to your cluster
+- `helm` CLI installed
+- API token for the MaaS model endpoint
 
-```bash
-git clone <your-repo-url>
-cd openshift-ai-model-evaluation
-pnpm install
-pnpm -r --if-present install:deps
-```
+### Installation
 
-### Configure Environment
+1. Clone the repository:
 
 ```bash
-cp .env.example .env
+git clone https://github.com/rh-ai-quickstart/model-evaluation.git
+cd model-evaluation
 ```
 
-Minimum required variables:
-
-- `MAAS_ENDPOINT`
-- `API_TOKEN`
-- `MODEL_A_NAME`
-- `MODEL_B_NAME`
-- `EMBEDDING_MODEL`
-- `JUDGE_MODEL_NAME`
-
-Recommended for local UI dev:
-
-- set `ALLOWED_HOSTS=["http://localhost:3000"]` in `.env` (default UI dev server is port `3000`)
-
-### Run Locally
+2. Create a new OpenShift project:
 
 ```bash
-make db-start
-make db-upgrade
-make dev
+PROJECT="model-evaluation"
+oc new-project ${PROJECT}
 ```
 
-Local URLs:
+3. Install using Helm:
 
-- UI: `http://localhost:3000`
-- API: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-
-## OpenShift Deployment
-
-Helm chart and deployment options are documented in:
-
-- [`deploy/helm/ai-quickstart-template/README.md`](deploy/helm/ai-quickstart-template/README.md)
-
-Quick summary:
-
-- Build and push API/UI images.
-- Configure chart values (registry, model names, `API_TOKEN`, DB settings).
-- Install with Helm in your target namespace.
-- Migration job runs automatically.
-
-## Common Commands
+**Option A: Use MaaS models (recommended -- no GPU required)**
 
 ```bash
-make dev                # Run dev servers (UI + API)
-make build              # Build all packages
-make test               # Run tests
-make lint               # Run linters
-make db-start           # Start PostgreSQL container
-make db-stop            # Stop PostgreSQL container
-make db-upgrade         # Apply Alembic migrations
-make containers-build   # Build compose images
-make containers-up      # Start full compose stack
-make containers-down    # Stop compose stack
+helm install model-eval ./chart --namespace ${PROJECT} \
+  --set secrets.API_TOKEN="YOUR_API_TOKEN"
 ```
 
-## Repository Layout
+The default configuration uses these models via MaaS:
 
-```text
-packages/
-  ui/        React application
-  api/       FastAPI application
-  db/        SQLAlchemy models + Alembic migrations
-  configs/   Shared lint/format configs
-deploy/helm/ai-quickstart-template/   Helm chart
-compose.yml                            Local pgvector database
-Makefile                               Top-level workflow commands
+| Role | Default Model |
+|------|--------------|
+| Model A | Granite-3.3-8B-Instruct |
+| Model B | Llama-4-Scout-17B-16E-W4A16 |
+| Embedding | Nomic-embed-text-v2-moe |
+| Judge | Mistral-Small-24B-W8A8 |
+
+To use different models:
+
+```bash
+helm install model-eval ./chart --namespace ${PROJECT} \
+  --set secrets.API_TOKEN="YOUR_API_TOKEN" \
+  --set models.modelA.name="YOUR_MODEL_A" \
+  --set models.modelB.name="YOUR_MODEL_B" \
+  --set models.maasEndpoint="YOUR_MAAS_ENDPOINT"
 ```
 
-## Package Docs
+**Option B: Deploy with self-hosted models (requires GPU)**
 
-- [`packages/ui/README.md`](packages/ui/README.md)
-- [`packages/api/README.md`](packages/api/README.md)
-- [`packages/db/README.md`](packages/db/README.md)
+```bash
+helm install model-eval ./chart --namespace ${PROJECT} \
+  --set secrets.API_TOKEN="YOUR_API_TOKEN" \
+  --set llm-service.enabled=true \
+  --set models.modelA.deploymentMode=self-hosted \
+  --set models.modelB.deploymentMode=self-hosted
+```
 
-## Notes
+> **Note**: Option B requires GPU resources available in your cluster. See [Minimum hardware requirements](#minimum-hardware-requirements) for details.
 
-- Some internal package names still use `ai-quickstart-template` as a historical monorepo identifier.
-- The shipped product behavior and UI naming are aligned to **OpenShift AI Model Evaluation**.
+#### Testing model access (before deploying)
+
+Verify your MaaS endpoint is reachable before installing:
+
+```bash
+oc run test-model-access --rm -it --restart=Never \
+  --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
+  -- /bin/sh -c 'curl -sf --max-time 10 \
+    -H "Authorization: Bearer YOUR_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\": \"YOUR_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in one word.\"}], \"max_tokens\": 10}" \
+    "YOUR_MAAS_ENDPOINT/v1/chat/completions" && echo "" && echo "SUCCESS" || echo "FAILED"'
+```
+
+### Validating the deployment
+
+1. Check all pods are running:
+
+```bash
+oc get pods -n ${PROJECT}
+```
+
+2. Verify the database migration completed:
+
+```bash
+oc logs job/model-evaluation-migration -n ${PROJECT}
+```
+
+3. Get the application URL:
+
+```bash
+echo "https://$(oc get route/model-evaluation-ui-route -n ${PROJECT} --template='{{.spec.host}}')"
+```
+
+4. Test the health endpoint:
+
+```bash
+curl -sk "https://$(oc get route/model-evaluation-health-route -n ${PROJECT} --template='{{.spec.host}}')/health/"
+```
+
+### Delete
+
+To completely remove the deployment:
+
+1. Uninstall the Helm release:
+
+```bash
+helm uninstall model-eval --namespace ${PROJECT}
+```
+
+2. (Optional) Remove persistent volume claims:
+
+```bash
+oc delete pvc -l app.kubernetes.io/instance=model-eval -n ${PROJECT}
+```
+
+3. (Optional) Delete the project:
+
+```bash
+oc delete project ${PROJECT}
+```
+
+## Repository structure
+
+```
+.
+├── chart/                    # Helm chart for deploying the quickstart
+│   ├── Chart.yaml            # Chart metadata and dependencies
+│   ├── values.yaml           # Default configuration values
+│   └── templates/            # Kubernetes resource templates
+├── packages/
+│   ├── ui/                   # React frontend (Vite + TanStack Router/Query)
+│   ├── api/                  # FastAPI backend (evaluation orchestration)
+│   └── db/                   # SQLAlchemy models + Alembic migrations
+├── docs/
+│   └── images/               # Architecture diagrams and screenshots
+├── LICENSE
+└── README.md
+```
+
+## References
+
+- [Red Hat OpenShift AI Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/)
+- [DeepEval RAG Evaluation Metrics](https://docs.confident-ai.com/docs/metrics-introduction)
+- [AI Quickstart Contributing Guide](https://github.com/rh-ai-quickstart/ai-quickstart-contrib/blob/main/CONTRIBUTING.md)
+
+## Technical details
+
+### Evaluation metrics
+
+The system evaluates model responses using four DeepEval-based metrics:
+
+| Metric | What it measures |
+|--------|-----------------|
+| **Faithfulness** | Whether the answer is grounded in the retrieved context (scores below 0.7 indicate hallucination) |
+| **Answer Relevancy** | Whether the answer addresses the question asked |
+| **Context Precision** | Whether the retrieved chunks are relevant to the question |
+| **Context Relevancy** | Whether the retrieval pipeline surfaces useful context |
+
+A separate judge model (Mistral-Small-24B by default) evaluates responses from the candidate models, ensuring independent assessment.
+
+### Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, Vite, TanStack Router/Query, Tailwind CSS |
+| Backend | FastAPI, async Python, Pydantic v2 |
+| Database | PostgreSQL + pgvector, SQLAlchemy 2.0, Alembic |
+| Deployment | Helm on OpenShift, TLS-terminated routes |
+
+### API endpoints
+
+Once deployed, the API is available at the route path `/api`. Interactive API documentation (Swagger UI) is accessible at `/api/docs`.
+
+## Tags
+
+**Title:** Evaluate and Compare Models in Financial Services
+**Description:** Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
+**Industry:** Banking and securities
+**Product:** OpenShift AI
+**Use case:** Productivity
+**Partner:** N/A
+**Contributor org:** Red Hat
