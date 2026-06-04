@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for question synthesizer endpoint and service."""
 
 import json

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Change eval_run.question_set_id FK from SET NULL to CASCADE.
 
 When a question set is deleted, all associated eval runs (and their

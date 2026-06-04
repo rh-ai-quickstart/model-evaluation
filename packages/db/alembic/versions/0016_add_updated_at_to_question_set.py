@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add updated_at column to question_set table.
 
 Revision ID: 0016

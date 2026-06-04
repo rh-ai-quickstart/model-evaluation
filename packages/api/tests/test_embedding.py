@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for embedding service."""
 
 from unittest.mock import AsyncMock, MagicMock, patch

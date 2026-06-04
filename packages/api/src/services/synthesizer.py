@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Question synthesizer -- generates evaluation questions from document chunks."""
 
 import json

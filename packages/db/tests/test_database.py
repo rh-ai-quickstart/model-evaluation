@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Database module tests (no database connection required)."""
 
 from db.database import Base, SessionLocal, engine

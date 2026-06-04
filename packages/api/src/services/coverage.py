@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Coverage gap detection -- extracts key concepts from expected answers
 and checks which are present in the model's actual answer, distinguishing
 between retrieval failures (concept not in context) and generation failures

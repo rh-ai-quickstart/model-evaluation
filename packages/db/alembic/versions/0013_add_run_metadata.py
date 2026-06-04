@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add run metadata columns to eval_run for reproducibility.
 
 Stores judge_model_name, synthesis_model_name, retrieval_config,

@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { ServiceCard } from "../service-card/service-card";
 import { Monitor, Server, Database } from "lucide-react";

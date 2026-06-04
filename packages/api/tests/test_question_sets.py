@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for question set endpoints (/question-sets)."""
 
 from unittest.mock import AsyncMock, patch

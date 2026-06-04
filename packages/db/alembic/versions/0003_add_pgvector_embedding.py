@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 """Add pgvector extension and embedding column to chunk table.
 

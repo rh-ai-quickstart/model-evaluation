@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 # Model Evaluation Database
 
@@ -30,17 +29,14 @@ alembic/
   versions/         migration history
 ```
 
-## Local Database Defaults
+## Database Defaults
 
-Compose service: `ai-quickstart-template-db` (`compose.yml` at repo root)
-
-- host: `localhost`
+- host: `localhost` (local dev) / `model-evaluation-db` (OpenShift)
 - port: `5432`
-- db: `ai-quickstart-template`
+- db: `model-evaluation`
 - user: `user`
-- compose password default: `changeme`
 
-In application config, `DATABASE_URL` and credentials can be overridden from `.env`.
+Configure `DATABASE_URL` and credentials via environment variables or Helm values.
 
 ## Migrations
 
@@ -84,4 +80,4 @@ async def endpoint(session: AsyncSession = Depends(get_db)):
 ## Notes
 
 - Do not hardcode migration count in docs; use `alembic/versions/` as source of truth.
-- Keep `.env` values aligned with your local compose credentials before running migrations.
+- Keep database credentials aligned between your environment and migration config before running migrations.

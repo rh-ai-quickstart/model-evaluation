@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for generation service."""
 
 from unittest.mock import AsyncMock, MagicMock, patch

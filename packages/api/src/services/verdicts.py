@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Business verdict layer -- applies profile thresholds to raw metric scores.
 
 All pass/fail logic lives here. The scoring layer (scoring.py) produces raw

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add deterministic_checks JSON column to eval_result.
 
 Stores per-question deterministic check results: document presence,

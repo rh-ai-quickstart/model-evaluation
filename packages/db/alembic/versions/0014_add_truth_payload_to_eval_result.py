@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add truth_payload column to eval_result.
 
 Stores the frozen structured truth (answer_truth, retrieval_truth, metadata)

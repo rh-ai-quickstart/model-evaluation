@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Evaluation endpoints -- create, list, and inspect evaluation runs."""
 
 import asyncio

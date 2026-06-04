@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for text chunking service."""
 
 from src.services.chunking import CHUNK_SIZE, _is_heading, chunk_text, section_chunk_text

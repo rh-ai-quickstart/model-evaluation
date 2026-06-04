@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for the document parser service (Docling + pypdf)."""
 
 import io

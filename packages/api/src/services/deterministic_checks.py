@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Deterministic evaluation checks -- rule-based, no LLM judge required.
 
 These checks validate retrieval quality and answer quality using string

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """FastAPI application entry point."""
 
 from fastapi import FastAPI

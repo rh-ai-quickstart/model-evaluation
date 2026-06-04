@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add chunk alignment score columns.
 
 Stores per-question retrieval quality (chunk_alignment_score on eval_result)

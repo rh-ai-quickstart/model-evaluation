@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for health check endpoints (/health/live, /health/ready)."""
 
 from unittest.mock import patch

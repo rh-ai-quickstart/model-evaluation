@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Safety service -- input/output filtering via Llama Guard on MaaS."""
 
 import logging

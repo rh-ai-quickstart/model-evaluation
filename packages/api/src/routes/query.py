@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """RAG query endpoint -- retrieve context and generate an answer."""
 
 import logging

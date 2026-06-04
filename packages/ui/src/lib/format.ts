@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 export function formatScore(val: number | null | undefined): string {
     if (val == null) return '--';

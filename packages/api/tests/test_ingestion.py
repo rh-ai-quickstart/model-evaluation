@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for document ingestion service."""
 
 from dataclasses import dataclass

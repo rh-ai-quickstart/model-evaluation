@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useEffect, useRef } from 'react';
 import { Bot, MessageSquare } from 'lucide-react';

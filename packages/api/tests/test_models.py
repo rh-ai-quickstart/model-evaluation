@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for model serving endpoints (/models)."""
 
 from src.core.config import settings

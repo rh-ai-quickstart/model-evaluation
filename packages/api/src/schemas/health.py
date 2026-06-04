@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Health check response schemas per REQ-5-006."""
 
 from pydantic import BaseModel

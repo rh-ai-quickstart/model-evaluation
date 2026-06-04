@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Model serving endpoints -- list, status, and switch active model."""
 
 import logging

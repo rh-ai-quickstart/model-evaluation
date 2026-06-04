@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 """Create eval_run and eval_result tables.
 

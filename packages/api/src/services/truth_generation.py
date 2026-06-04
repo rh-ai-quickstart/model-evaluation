@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Truth generation service -- creates structured truth payloads for questions.
 
 Generates truth for two entry paths:

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Fetches model metadata from the LiteLLM admin API."""
 
 import logging

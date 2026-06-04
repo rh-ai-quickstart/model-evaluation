@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Question set endpoints -- create, list, and delete reusable question sets."""
 
 import logging

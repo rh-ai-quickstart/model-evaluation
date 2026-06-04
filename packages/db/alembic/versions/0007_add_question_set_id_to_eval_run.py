@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 """Add question_set_id to eval_run.
 

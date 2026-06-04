@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Consolidated LLM-as-judge scoring for evaluation results.
 
 Scores RAG responses on faithfulness (groundedness), answer relevancy,

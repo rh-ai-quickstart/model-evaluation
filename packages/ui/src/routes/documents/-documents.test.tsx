@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { waitFor } from '@testing-library/react';

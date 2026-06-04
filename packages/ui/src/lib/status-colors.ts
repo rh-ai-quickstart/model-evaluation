@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 export const EVAL_STATUS_COLORS: Record<string, string> = {
     pending: 'bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:text-slate-300',

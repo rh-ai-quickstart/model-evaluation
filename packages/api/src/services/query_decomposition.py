@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Query decomposition service -- breaks broad questions into targeted sub-queries.
 
 For multi-document RAG, a single broad question tends to retrieve chunks from

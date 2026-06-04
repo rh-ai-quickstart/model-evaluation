@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Text chunking for RAG pipeline.
 
 Provides two chunking strategies:

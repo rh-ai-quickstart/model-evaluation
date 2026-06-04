@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for deterministic retrieval checks."""
 
 from src.schemas.truth import AnswerTruth, RetrievalTruth, TruthMetadata, TruthPayload

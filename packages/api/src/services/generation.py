@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Generation service -- calls the LLM via the MaaS /v1/chat/completions endpoint."""
 
 import asyncio
