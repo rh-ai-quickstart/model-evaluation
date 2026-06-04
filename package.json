@@ -1,7 +1,7 @@
 {
-  "name": "ai-quickstart-template",
+  "name": "model-evaluation",
   "version": "0.1.0",
-  "description": "A ready-made template for creating new AI Quickstarts",
+  "description": "Evaluate and compare candidate LLMs for RAG workloads on OpenShift AI",
   "private": true,
   "workspaces": [
     "packages/*"

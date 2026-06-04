@@ -11,7 +11,7 @@ Deploys the full OpenShift AI Model Evaluation stack:
 Chart metadata:
 
 - chart name: `model-evaluation`
-- chart path: `deploy/helm/ai-quickstart-template`
+- chart path: `chart/`
 
 ## Prerequisites
 
@@ -25,9 +25,8 @@ Chart metadata:
 
 ```bash
 oc new-project model-evaluation || oc project model-evaluation
-cd deploy/helm/ai-quickstart-template
 
-helm install model-eval . \
+helm install model-eval ./chart \
   --namespace model-evaluation \
   --set secrets.API_TOKEN="<your-token>"
 ```
@@ -96,7 +95,7 @@ models:
 ## Upgrade / Uninstall
 
 ```bash
-helm upgrade model-eval . -n model-evaluation --reuse-values
+helm upgrade model-eval ./chart -n model-evaluation --reuse-values
 helm uninstall model-eval -n model-evaluation
 ```
 
@@ -119,6 +118,3 @@ oc logs job/model-evaluation-migration -n model-evaluation
 oc get routes,svc -n model-evaluation
 ```
 
-## Known Cosmetic Mismatch
-
-The chart directory (`ai-quickstart-template`) differs from chart name (`model-evaluation`); this does not affect install behavior.

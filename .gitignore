@@ -57,3 +57,27 @@ venv.bak/
 # Database
 *.db
 *.sqlite
+
+# AI dev tooling (local only)
+.claude/
+.codex/
+.cursor/
+.agents/
+AGENTS.md
+
+# Internal planning docs (local only)
+plans/
+
+# Dev-only config
+.husky/
+commitlint.config.js
+.releaserc
+turbo.json
+pyrightconfig.json
+pnpm-workspace.yaml
+Makefile
+compose.yml
+.env.example
+
+# Shared lint configs (dev only)
+packages/configs/
