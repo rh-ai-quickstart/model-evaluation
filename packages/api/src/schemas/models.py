@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Pydantic schemas for model serving endpoints."""
 
 from pydantic import BaseModel, Field

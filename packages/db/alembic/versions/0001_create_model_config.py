@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 """Create model_config table.
 

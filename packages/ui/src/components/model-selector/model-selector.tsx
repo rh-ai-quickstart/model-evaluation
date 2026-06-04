@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useState, useEffect, useRef } from 'react';
 import { useModels } from '../../hooks/models';

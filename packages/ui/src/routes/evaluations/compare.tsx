@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useState, useEffect } from 'react';
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';

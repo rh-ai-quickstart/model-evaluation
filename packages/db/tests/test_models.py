@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 
 """Model schema tests (no database required)."""
 

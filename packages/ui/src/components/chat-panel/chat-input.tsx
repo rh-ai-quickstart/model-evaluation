@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useState, useRef, useEffect } from 'react';
 import { SendHorizontal } from 'lucide-react';

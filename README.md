@@ -1,5 +1,3 @@
-<!-- This project was developed with assistance from AI tools. -->
-
 # Evaluate and Compare Models in Financial Services
 
 Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.

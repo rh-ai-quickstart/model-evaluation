@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Evaluation profile loader -- reads versioned YAML profiles from disk."""
 
 import logging

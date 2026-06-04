@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Retrieval service -- hybrid search with vector similarity and keyword matching.
 
 Supports profile-driven configuration: top_k, max_chunks_per_document,

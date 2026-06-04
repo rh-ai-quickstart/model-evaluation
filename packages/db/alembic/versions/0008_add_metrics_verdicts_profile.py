@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add new metric scores, verdict columns, and profile fields.
 
 New EvalResult columns: completeness_score, correctness_score,

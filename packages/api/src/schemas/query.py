@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Pydantic schemas for the RAG query endpoint."""
 
 from pydantic import BaseModel, Field

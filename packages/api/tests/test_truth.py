@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for structured truth schema and truth generation service."""
 
 import asyncio

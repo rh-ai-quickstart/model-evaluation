@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add context_relevancy_score to eval_result and avg_context_relevancy to eval_run.
 
 Revision ID: 0005

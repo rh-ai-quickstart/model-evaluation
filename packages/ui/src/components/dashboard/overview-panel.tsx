@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { Link } from '@tanstack/react-router';
 import { useEvalRuns } from '../../hooks/evaluation';

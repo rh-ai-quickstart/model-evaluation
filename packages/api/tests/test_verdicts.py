@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for the verdict service and profile loader."""
 
 import pytest

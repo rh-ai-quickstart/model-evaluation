@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useQuery } from '@tanstack/react-query';
 import { getModels, getModelStatus, getModelMetadata } from '../services/models';

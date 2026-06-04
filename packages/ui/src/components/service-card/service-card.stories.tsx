@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServiceCard } from './service-card';

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add coverage_gaps JSON column to eval_result.
 
 Stores per-question coverage gap analysis: which key concepts from the

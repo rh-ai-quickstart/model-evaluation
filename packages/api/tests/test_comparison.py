@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for comparison decision logic.
 
 Covers disqualification gates, verdict hierarchy, failure counts,

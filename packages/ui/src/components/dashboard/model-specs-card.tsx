@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { Cpu, Sparkles } from 'lucide-react';
 import type { ModelMetadata } from '../../schemas/models';

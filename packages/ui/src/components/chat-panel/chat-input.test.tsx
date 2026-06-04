@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';

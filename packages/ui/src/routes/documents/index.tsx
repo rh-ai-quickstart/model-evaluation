@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useRef, useState } from 'react';

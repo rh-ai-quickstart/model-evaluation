@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for retrieval service."""
 
 from collections import namedtuple

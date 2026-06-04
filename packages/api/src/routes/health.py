@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Health check endpoints per REQ-5-006.
 
 /health/live  -- lightweight liveness probe (process is responsive)

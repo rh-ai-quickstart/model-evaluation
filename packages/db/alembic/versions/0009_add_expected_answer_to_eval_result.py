@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Add expected_answer column to eval_result.
 
 Stores the expected answer used during scoring so it can be displayed

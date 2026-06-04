@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"

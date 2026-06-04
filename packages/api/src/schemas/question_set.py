@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Pydantic schemas for question set endpoints."""
 
 from datetime import datetime

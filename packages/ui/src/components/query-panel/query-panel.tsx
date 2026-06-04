@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { useState } from 'react';
 import { Send, FileText, AlertTriangle, Loader2 } from 'lucide-react';

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Document management endpoints -- upload, list, and status."""
 
 import asyncio

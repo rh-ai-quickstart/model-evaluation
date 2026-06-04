@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Pydantic schemas for structured truth payloads.
 
 Truth is a frozen, immutable object attached to each question at creation time.

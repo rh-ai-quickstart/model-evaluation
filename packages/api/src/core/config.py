@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Application configuration via pydantic-settings."""
 
 import logging

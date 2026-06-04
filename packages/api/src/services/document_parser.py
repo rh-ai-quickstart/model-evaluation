@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Document parsing with Docling (layout-aware) and pypdf (fallback).
 
 Provides a unified ``parse_pdf()`` entry point that returns structured

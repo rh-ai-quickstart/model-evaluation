@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Ingestion endpoints -- ingest documents from URLs and S3/MinIO."""
 
 import logging

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Document ingestion service -- download and process PDFs from URLs and S3."""
 
 import logging

@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Tests for evaluation endpoints (/evaluations)."""
 
 from unittest.mock import AsyncMock, patch

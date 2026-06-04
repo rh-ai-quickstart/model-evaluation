@@ -1,4 +1,3 @@
-# This project was developed with assistance from AI tools.
 """Pydantic schemas for document management endpoints."""
 
 from pydantic import BaseModel

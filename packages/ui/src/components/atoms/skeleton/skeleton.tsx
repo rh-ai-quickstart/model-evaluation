@@ -1,4 +1,3 @@
-// This project was developed with assistance from AI tools.
 
 import { cn } from "../../../lib/utils"
 
