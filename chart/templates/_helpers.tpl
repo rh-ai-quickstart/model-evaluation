@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "ai-quickstart-template.name" -}}
+{{- define "model-evaluation.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "ai-quickstart-template.fullname" -}}
+{{- define "model-evaluation.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "ai-quickstart-template.chart" -}}
+{{- define "model-evaluation.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "ai-quickstart-template.labels" -}}
-helm.sh/chart: {{ include "ai-quickstart-template.chart" . }}
-{{ include "ai-quickstart-template.selectorLabels" . }}
+{{- define "model-evaluation.labels" -}}
+helm.sh/chart: {{ include "model-evaluation.chart" . }}
+{{ include "model-evaluation.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -43,17 +43,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "ai-quickstart-template.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "ai-quickstart-template.name" . }}
+{{- define "model-evaluation.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "model-evaluation.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "ai-quickstart-template.serviceAccountName" -}}
+{{- define "model-evaluation.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "ai-quickstart-template.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "model-evaluation.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -62,7 +62,7 @@ Create the name of the service account to use
 {{/*
 Image name helper
 */}}
-{{- define "ai-quickstart-template.image" -}}
+{{- define "model-evaluation.image" -}}
 {{- $registry := .Values.global.imageRegistry -}}
 {{- $repository := .Values.global.imageRepository -}}
 {{- $name := .name -}}
@@ -73,78 +73,78 @@ Image name helper
 {{/*
 API labels
 */}}
-{{- define "ai-quickstart-template.api.labels" -}}
-{{ include "ai-quickstart-template.labels" . }}
+{{- define "model-evaluation.api.labels" -}}
+{{ include "model-evaluation.labels" . }}
 app.kubernetes.io/component: api
 {{- end }}
 
 {{/*
 API selector labels
 */}}
-{{- define "ai-quickstart-template.api.selectorLabels" -}}
-{{ include "ai-quickstart-template.selectorLabels" . }}
+{{- define "model-evaluation.api.selectorLabels" -}}
+{{ include "model-evaluation.selectorLabels" . }}
 app.kubernetes.io/component: api
 {{- end }}
 
 {{/*
 UI labels
 */}}
-{{- define "ai-quickstart-template.ui.labels" -}}
-{{ include "ai-quickstart-template.labels" . }}
+{{- define "model-evaluation.ui.labels" -}}
+{{ include "model-evaluation.labels" . }}
 app.kubernetes.io/component: ui
 {{- end }}
 
 {{/*
 UI selector labels
 */}}
-{{- define "ai-quickstart-template.ui.selectorLabels" -}}
-{{ include "ai-quickstart-template.selectorLabels" . }}
+{{- define "model-evaluation.ui.selectorLabels" -}}
+{{ include "model-evaluation.selectorLabels" . }}
 app.kubernetes.io/component: ui
 {{- end }}
 
 {{/*
 Database labels
 */}}
-{{- define "ai-quickstart-template.database.labels" -}}
-{{ include "ai-quickstart-template.labels" . }}
+{{- define "model-evaluation.database.labels" -}}
+{{ include "model-evaluation.labels" . }}
 app.kubernetes.io/component: database
 {{- end }}
 
 {{/*
 Database selector labels
 */}}
-{{- define "ai-quickstart-template.database.selectorLabels" -}}
-{{ include "ai-quickstart-template.selectorLabels" . }}
+{{- define "model-evaluation.database.selectorLabels" -}}
+{{ include "model-evaluation.selectorLabels" . }}
 app.kubernetes.io/component: database
 {{- end }}
 
 {{/*
 Migration labels
 */}}
-{{- define "ai-quickstart-template.migration.labels" -}}
-{{ include "ai-quickstart-template.labels" . }}
+{{- define "model-evaluation.migration.labels" -}}
+{{ include "model-evaluation.labels" . }}
 app.kubernetes.io/component: migration
 {{- end }}
 
 {{/*
 Migration selector labels
 */}}
-{{- define "ai-quickstart-template.migration.selectorLabels" -}}
-{{ include "ai-quickstart-template.selectorLabels" . }}
+{{- define "model-evaluation.migration.selectorLabels" -}}
+{{ include "model-evaluation.selectorLabels" . }}
 app.kubernetes.io/component: migration
 {{- end }}
 
 {{/*
 Validate required values
 */}}
-{{- define "ai-quickstart-template.validateValues" -}}
+{{- define "model-evaluation.validateValues" -}}
 {{- required "A valid .Values.secrets.API_TOKEN is required. Set it with --set secrets.API_TOKEN=<your-maas-token>" .Values.secrets.API_TOKEN -}}
 {{- end }}
 
 {{/*
 Derive API base URL from route configuration
 */}}
-{{- define "ai-quickstart-template.apiBaseUrl" -}}
+{{- define "model-evaluation.apiBaseUrl" -}}
 {{- if .Values.secrets.VITE_API_BASE_URL -}}
 {{- .Values.secrets.VITE_API_BASE_URL -}}
 {{- else if .Values.routes.enabled -}}

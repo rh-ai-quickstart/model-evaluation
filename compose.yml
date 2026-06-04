@@ -1,0 +1,21 @@
+services:
+  model-evaluation-db:
+    image: docker.io/pgvector/pgvector:pg16
+    labels:
+      com.quickstart.package: db
+    environment:
+      POSTGRES_DB: model-evaluation
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - model-evaluation_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d model-evaluation"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  model-evaluation_postgres_data:
