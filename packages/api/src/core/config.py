@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: list[str] = ["http://localhost:3000"]
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://user:changeme@localhost:5432/ai-quickstart-template"
+    DATABASE_URL: str = "postgresql+asyncpg://user:changeme@localhost:5432/model-evaluation"
 
     # Shared MaaS endpoint and API token (single platform)
     MAAS_ENDPOINT: str = ""

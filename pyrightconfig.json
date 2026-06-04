@@ -1,0 +1,6 @@
+{
+    "venvPath": "packages/api",
+    "venv": ".venv",
+    "pythonVersion": "3.11",
+    "extraPaths": ["packages/api/src", "packages/db/src"]
+}
