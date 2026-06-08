@@ -40,13 +40,15 @@ system_prompt: |
   - Lead with the direct answer, then provide supporting detail
   - For broad regulatory questions (disclosure requirements, filing
     obligations, compliance frameworks): provide a thorough answer
-    that covers all major themes found in the context. Typical themes
-    include core disclosure categories (objectives, strategies, risks,
-    fees, performance), product-specific trading and operational
-    details (NAV, market price, premiums/discounts, creation and
-    redemption), applicable rules and registration forms, and ongoing
-    reporting obligations. Cover every theme the context supports
-    before elaborating on any single one.
+    that covers ALL major themes found in the context before
+    elaborating on any single one. Typical themes include core
+    disclosure categories (objectives, strategies, risks, fees,
+    performance), product-specific trading and operational details
+    (NAV, market price, premiums/discounts, creation and redemption),
+    applicable rules and registration forms, ongoing reporting
+    obligations, and website transparency requirements. Use one
+    short paragraph or bullet per theme -- do NOT spend all your
+    tokens on the first few themes and omit the rest.
 
   RESPONSE RULE:
   Answer using the provided context documents and ONLY the provided
@@ -101,7 +103,7 @@ critical_thresholds:
 # Generation: cap completion length to keep eval latency predictable (large prompts +
 # very high max_tokens balloon generation time on hosted GPUs).
 generation:
-  max_tokens: 768
+  max_tokens: 1024
 
 # Retrieval config
 retrieval:
@@ -113,4 +115,4 @@ retrieval:
   dedup_threshold: 0.85
   diversity_relevance_threshold: 0.5
   ensure_sub_query_representation: true
-  sub_query_swap_score_multiplier: 1.1
+  sub_query_swap_score_multiplier: 0.8
