@@ -98,20 +98,20 @@ ACTUAL ANSWER:
 def _check_concept_in_contexts(concept: str, contexts: list[str]) -> bool:
     """Check if a concept appears in retrieval contexts using keyword overlap.
 
-    Uses a simple word overlap heuristic -- if >40% of the concept's
-    significant words appear in any single context chunk, the concept
+    Uses word-boundary matching -- if >40% of the concept's significant
+    words appear as whole tokens in the combined context, the concept
     is considered present in retrieval.
     """
     if not contexts:
         return False
 
-    # Extract significant words (3+ chars, lowered)
     concept_words = {w.lower() for w in concept.split() if len(w) >= 3}
     if not concept_words:
         return False
 
     combined = " ".join(contexts).lower()
-    matched = sum(1 for w in concept_words if w in combined)
+    context_tokens = {w.rstrip(".,;:!?'\")]}") for w in combined.split()}
+    matched = sum(1 for w in concept_words if w in context_tokens)
     return matched / len(concept_words) >= 0.4
 
 

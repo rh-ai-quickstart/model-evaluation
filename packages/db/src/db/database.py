@@ -20,7 +20,7 @@ class Base(DeclarativeBase):
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://user:password@localhost:5432/model-evaluation"
+    "postgresql+asyncpg://user:changeme@localhost:5432/model-evaluation"
 )
 
 engine = create_async_engine(
