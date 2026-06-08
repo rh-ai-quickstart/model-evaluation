@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useDocuments } from '../../hooks/documents';
 import type { ComparisonMetric, ComparisonResponse, CoverageGaps, EvalResult, EvalRun } from '../../schemas/evaluation';
-import { formatScore, formatLatency, formatMetricValue } from '../../lib/format';
+import { formatScore, formatLatency, formatMetricValue, formatUtcDate } from '../../lib/format';
 import {
     Select,
     SelectContent,
@@ -808,8 +808,13 @@ function CompareSelector() {
                             </SelectTrigger>
                             <SelectContent>
                                 {completedRuns.map((r: EvalRun) => (
-                                    <SelectItem key={r.id} value={String(r.id)}>
-                                        #{r.id} - {r.model_name}
+                                    <SelectItem key={r.id} value={String(r.id)} textValue={`#${r.id} - ${r.model_name}`}>
+                                        <span className="flex flex-col">
+                                            <span>#{r.id} - {r.model_name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {formatUtcDate(r.completed_at || r.created_at)} · Faith: {formatScore(r.avg_groundedness)} · {r.total_questions}q
+                                            </span>
+                                        </span>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -829,8 +834,13 @@ function CompareSelector() {
                             </SelectTrigger>
                             <SelectContent>
                                 {completedRuns.map((r: EvalRun) => (
-                                    <SelectItem key={r.id} value={String(r.id)}>
-                                        #{r.id} - {r.model_name}
+                                    <SelectItem key={r.id} value={String(r.id)} textValue={`#${r.id} - ${r.model_name}`}>
+                                        <span className="flex flex-col">
+                                            <span>#{r.id} - {r.model_name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {formatUtcDate(r.completed_at || r.created_at)} · Faith: {formatScore(r.avg_groundedness)} · {r.total_questions}q
+                                            </span>
+                                        </span>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
