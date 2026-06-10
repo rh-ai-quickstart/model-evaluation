@@ -18,6 +18,9 @@ import {
     ChevronDown,
 } from 'lucide-react';
 import { useDocuments } from '../../hooks/documents';
+import { useModelMetadata } from '../../hooks/models';
+import { findModelMetadata } from '../../components/dashboard/model-specs-card';
+import type { ModelMetadata } from '../../schemas/models';
 import type { ComparisonMetric, ComparisonResponse, CoverageGaps, EvalResult, EvalRun } from '../../schemas/evaluation';
 import { formatScore, formatLatency, formatMetricValue, formatUtcDate } from '../../lib/format';
 import {
@@ -865,11 +868,93 @@ function CompareSelector() {
     );
 }
 
+function buildComparisonSummary(
+    data: ComparisonResponse,
+    metaA: ModelMetadata | undefined,
+    metaB: ModelMetadata | undefined,
+): string {
+    const { run_a, run_b, metrics, decision } = data;
+    const nameA = run_a.model_name;
+    const nameB = run_b.model_name;
+
+    const parts: string[] = [];
+
+    if (decision?.winner_name && decision.decision_status !== 'inconclusive') {
+        const loser = decision.winner_name === nameA ? nameB : nameA;
+        const qualifier = decision.decision_status === 'marginal' ? 'marginally' : '';
+        parts.push(`${decision.winner_name} ${qualifier ? qualifier + ' ' : ''}outperforms ${loser} on this evaluation.`);
+    } else {
+        parts.push(`${nameA} and ${nameB} perform comparably on this evaluation.`);
+    }
+
+    const scoreMetrics = metrics.filter((m) => m.metric !== 'latency_ms' && m.run_a != null && m.run_b != null);
+    const winsA = scoreMetrics.filter((m) => m.winner === 'run_a').length;
+    const winsB = scoreMetrics.filter((m) => m.winner === 'run_b').length;
+    const ties = scoreMetrics.filter((m) => m.winner === 'tie' || !m.winner).length;
+    if (scoreMetrics.length > 0) {
+        parts.push(`Across ${scoreMetrics.length} metrics: ${nameA} wins ${winsA}, ${nameB} wins ${winsB}${ties > 0 ? `, ${ties} tied` : ''}.`);
+    }
+
+    const latencyMetric = metrics.find((m) => m.metric === 'latency_ms');
+    if (latencyMetric?.run_a != null && latencyMetric?.run_b != null) {
+        const diff = Math.abs(latencyMetric.run_a - latencyMetric.run_b);
+        if (diff > 1000) {
+            const faster = latencyMetric.run_a < latencyMetric.run_b ? nameA : nameB;
+            parts.push(`${faster} is ${formatLatency(diff)} faster per question.`);
+        }
+    }
+
+    if (metaA?.pricing?.input != null && metaB?.pricing?.input != null) {
+        const priceA = metaA.pricing.input;
+        const priceB = metaB.pricing.input;
+        if (priceA > 0 && priceB > 0 && priceA !== priceB) {
+            const cheaper = priceA < priceB ? nameA : nameB;
+            const ratio = Math.max(priceA, priceB) / Math.min(priceA, priceB);
+            const pct = Math.round((1 - 1 / ratio) * 100);
+            if (pct >= 10) {
+                parts.push(`${cheaper} is ${pct}% cheaper per token.`);
+            }
+        }
+    }
+
+    if (metaA?.context_length && metaB?.context_length) {
+        const ratio = metaA.context_length / metaB.context_length;
+        if (ratio > 1.5) {
+            parts.push(`${nameA} has a ${Math.round(ratio)}x larger context window.`);
+        } else if (ratio < 1 / 1.5) {
+            parts.push(`${nameB} has a ${Math.round(1 / ratio)}x larger context window.`);
+        }
+    }
+
+    return parts.join(' ');
+}
+
+function ComparisonSummaryCard({ data, metaA, metaB }: {
+    data: ComparisonResponse;
+    metaA: ModelMetadata | undefined;
+    metaB: ModelMetadata | undefined;
+}) {
+    const summary = buildComparisonSummary(data, metaA, metaB);
+
+    return (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-800 dark:bg-blue-950/30">
+            <div className="mb-1.5 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300">Summary</h3>
+            </div>
+            <p className="text-sm leading-relaxed text-blue-900 dark:text-blue-200">{summary}</p>
+        </div>
+    );
+}
+
 function ComparePage() {
     const navigate = useNavigate();
     const { run_a, run_b } = Route.useSearch();
     const { data, isLoading, error } = useCompareEvalRuns(run_a, run_b);
     const { data: documents } = useDocuments();
+    const { data: metadataResponse } = useModelMetadata();
+    const [metricsExpanded, setMetricsExpanded] = useState(false);
+    const [questionsExpanded, setQuestionsExpanded] = useState(false);
 
     useEffect(() => {
         if (data) {
@@ -962,37 +1047,59 @@ function ComparePage() {
 
                 <ExecutiveVerdictCard data={data} />
 
+                <ComparisonSummaryCard
+                    data={data}
+                    metaA={findModelMetadata(metadataResponse?.models, modelA)}
+                    metaB={findModelMetadata(metadataResponse?.models, modelB)}
+                />
+
                 {/* Aggregate metrics */}
-                <div className="mb-8">
-                    <h2 className="mb-3 text-lg font-semibold">Aggregate Metrics</h2>
-                    <div className="space-y-2">
-                        {data.metrics.map((metric) => (
-                            <MetricRow
-                                key={metric.metric}
-                                metric={metric}
-                                modelA={modelA}
-                                modelB={modelB}
-                            />
-                        ))}
-                    </div>
+                <div className="mb-6 rounded-xl border bg-card">
+                    <button
+                        onClick={() => setMetricsExpanded(!metricsExpanded)}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                        <h2 className="text-lg font-semibold">Aggregate Metrics</h2>
+                        <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${metricsExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                    {metricsExpanded && (
+                        <div className="space-y-2 border-t px-4 pb-4 pt-3">
+                            {data.metrics.map((metric) => (
+                                <MetricRow
+                                    key={metric.metric}
+                                    metric={metric}
+                                    modelA={modelA}
+                                    modelB={modelB}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Per-question breakdown */}
-                <div>
-                    <h2 className="mb-3 text-lg font-semibold">Per-Question Breakdown</h2>
-                    <div className="space-y-3">
-                        {data.questions.map((q, i) => (
-                            <QuestionRow
-                                key={i}
-                                question={q.question}
-                                expectedAnswer={q.expected_answer}
-                                resultA={q.run_a}
-                                resultB={q.run_b}
-                                modelA={modelA}
-                                modelB={modelB}
-                            />
-                        ))}
-                    </div>
+                <div className="rounded-xl border bg-card">
+                    <button
+                        onClick={() => setQuestionsExpanded(!questionsExpanded)}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                        <h2 className="text-lg font-semibold">Per-Question Breakdown</h2>
+                        <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${questionsExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                    {questionsExpanded && (
+                        <div className="space-y-3 border-t px-4 pb-4 pt-3">
+                            {data.questions.map((q, i) => (
+                                <QuestionRow
+                                    key={i}
+                                    question={q.question}
+                                    expectedAnswer={q.expected_answer}
+                                    resultA={q.run_a}
+                                    resultB={q.run_b}
+                                    modelA={modelA}
+                                    modelB={modelB}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

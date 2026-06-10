@@ -124,15 +124,15 @@ export function OverviewPanel({ selectedModelId }: { selectedModelId: number | n
             </div>
 
             {models && models.length >= 2 && metadataResponse?.available && (() => {
-                const currentModel = models.find((m) => m.id === selectedModelId) ?? models[0];
-                const otherModel = models.find((m) => m.id !== currentModel.id) ?? models[1];
+                const selectedModel = models.find((m) => m.id === selectedModelId);
                 return (
                     <div className="mt-3 flex min-h-0 flex-1 flex-col">
                         <ModelSpecsCard
-                            modelAName={currentModel.name}
-                            modelBName={otherModel.name}
-                            metaA={findModelMetadata(metadataResponse?.models, currentModel.name)}
-                            metaB={findModelMetadata(metadataResponse?.models, otherModel.name)}
+                            modelAName={models[0].name}
+                            modelBName={models[1].name}
+                            metaA={findModelMetadata(metadataResponse?.models, models[0].name)}
+                            metaB={findModelMetadata(metadataResponse?.models, models[1].name)}
+                            selectedModelName={selectedModel?.name}
                         />
                     </div>
                 );
