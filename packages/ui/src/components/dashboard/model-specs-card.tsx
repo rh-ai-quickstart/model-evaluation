@@ -76,9 +76,10 @@ interface ModelSpecsCardProps {
     modelBName: string;
     metaA: ModelMetadata | undefined;
     metaB: ModelMetadata | undefined;
+    selectedModelName?: string;
 }
 
-export function ModelSpecsCard({ modelAName, modelBName, metaA, metaB }: ModelSpecsCardProps) {
+export function ModelSpecsCard({ modelAName, modelBName, metaA, metaB, selectedModelName }: ModelSpecsCardProps) {
     if (!metaA && !metaB) return null;
 
     const insights = computeInsights(metaA, metaB, modelAName, modelBName);
@@ -94,11 +95,20 @@ export function ModelSpecsCard({ modelAName, modelBName, metaA, metaB }: ModelSp
                 <div />
                 <div className="flex flex-col items-center gap-1">
                     <span className="font-medium">{modelAName}</span>
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                        Current
-                    </span>
+                    {selectedModelName === modelAName && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            Current
+                        </span>
+                    )}
                 </div>
-                <div className="text-center font-medium">{modelBName}</div>
+                <div className="flex flex-col items-center gap-1">
+                    <span className="font-medium">{modelBName}</span>
+                    {selectedModelName === modelBName && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            Current
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="space-y-1">
