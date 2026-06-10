@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useModels } from '../../hooks/models';
 import { useSubmitQuery } from '../../hooks/query';
 import { ChatHeader } from './chat-header';
@@ -20,6 +20,7 @@ export function ChatPanel({ selectedModelId, onSelectedModelIdChange }: ChatPane
     const submitQuery = useSubmitQuery();
 
     const [messages, setMessages] = useState<ChatMessageEntry[]>([]);
+    const [inputResetKey, setInputResetKey] = useState(0);
 
     const selectedModel = models?.find((m) => m.id === selectedModelId);
 
@@ -29,12 +30,9 @@ export function ChatPanel({ selectedModelId, onSelectedModelIdChange }: ChatPane
         }
     }, [models, selectedModelId, onSelectedModelIdChange]);
 
-    const handleSelectModel = useCallback((model: Model) => {
-        onSelectedModelIdChange(model.id);
-    }, [onSelectedModelIdChange]);
-
     const handleNewChat = useCallback(() => {
         setMessages([]);
+        setInputResetKey((k) => k + 1);
     }, []);
 
     const handleSend = useCallback(
@@ -88,20 +86,38 @@ export function ChatPanel({ selectedModelId, onSelectedModelIdChange }: ChatPane
         [selectedModel, submitQuery],
     );
 
+    const pendingReask = useRef<string | null>(null);
+
+    const handleSelectModel = useCallback((model: Model) => {
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+        if (lastUserMsg) {
+            pendingReask.current = lastUserMsg.content;
+            setMessages([]);
+        }
+        onSelectedModelIdChange(model.id);
+    }, [onSelectedModelIdChange, messages]);
+
+    useEffect(() => {
+        if (pendingReask.current && selectedModel) {
+            const question = pendingReask.current;
+            pendingReask.current = null;
+            handleSend(question);
+        }
+    }, [selectedModel, handleSend]);
+
     return (
         <div className="flex h-full flex-col">
             <ChatHeader
                 selectedModelId={selectedModelId}
                 onSelectModel={handleSelectModel}
                 onNewChat={handleNewChat}
-                hasMessages={messages.length > 0}
             />
             <ChatMessageList
                 messages={messages}
                 modelName={selectedModel?.name ?? null}
                 onSuggestedClick={handleSend}
             />
-            <ChatInput onSend={handleSend} disabled={!selectedModel} />
+            <ChatInput key={inputResetKey} onSend={handleSend} disabled={!selectedModel} />
         </div>
     );
 }
