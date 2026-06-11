@@ -9,18 +9,18 @@ global:
 # Model serving configuration
 models:
   # MaaS endpoint (shared for all models)
-  maasEndpoint: "https://litellm-litemaas.apps.prod.rhoai.rh-aiservices-bu.com"
+  maasEndpoint: "https://litellm-prod.apps.maas.redhatworkshops.io"
   # Default models for A/B comparison
   modelA:
-    name: "Granite-3.3-8B-Instruct"
+    name: "granite-3-2-8b-instruct"
     deploymentMode: "maas"
   modelB:
-    name: "Llama-4-Scout-17B-16E-W4A16"
+    name: "deepseek-r1-distill-qwen-14b"
     deploymentMode: "maas"
   # Embedding model for RAG pipeline
-  embeddingModel: "Nomic-embed-text-v2-moe"
+  embeddingModel: "nomic-embed-text-v1-5"
   # Judge model for evaluation metrics (DeepEval) -- must be distinct from A and B
-  judgeModel: "Mistral-Small-24B-W8A8"
+  judgeModel: "llama-scout-17b"
 
 # Secrets configuration - override with actual secrets
 secrets:
