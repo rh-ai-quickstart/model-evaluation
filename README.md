@@ -40,9 +40,9 @@ The evaluation framework distinguishes between two failure modes that matter in 
 
 ### Architecture diagrams
 
-<!-- TODO: Add architecture diagram to docs/images/architecture-overview.png -->
-
 ![Architecture diagram showing data flow from document upload through RAG pipeline to evaluation dashboard](docs/images/architecture-overview.png)
+
+The FastAPI API orchestrates all workflows in a single pod — there are no separate embedding or worker services. Document ingestion parses and chunks PDFs synchronously, then embeds chunks via OpenShift AI MaaS in a background task. Model evaluation runs as an async background job: hybrid retrieval (pgvector + keyword search), candidate model generation, and LLM-as-judge scoring. The comparison dashboard reads stored evaluation runs from PostgreSQL with no additional LLM calls.
 
 ## Requirements
 
@@ -220,7 +220,8 @@ oc delete project ${PROJECT}
 │   ├── api/                  # FastAPI backend (evaluation orchestration)
 │   └── db/                   # SQLAlchemy models + Alembic migrations
 ├── docs/
-│   └── images/               # Architecture diagrams and screenshots
+│   └── images/
+│       └── architecture-overview.png   # Architecture diagram (see above)
 ├── LICENSE
 └── README.md
 ```
@@ -235,16 +236,20 @@ oc delete project ${PROJECT}
 
 ### Evaluation metrics
 
-The system evaluates model responses using four DeepEval-based metrics:
+Metric names follow common RAG evaluation terminology (see [DeepEval metrics](https://docs.confident-ai.com/docs/metrics-introduction) for comparable definitions). Scores are produced by a **consolidated LLM-as-judge** over OpenShift AI MaaS — not the DeepEval SDK at runtime.
 
 | Metric | What it measures |
 |--------|-----------------|
-| **Faithfulness** | Whether the answer is grounded in the retrieved context (scores below 0.7 indicate hallucination) |
-| **Answer Relevancy** | Whether the answer addresses the question asked |
-| **Context Precision** | Whether the retrieved chunks are relevant to the question |
-| **Context Relevancy** | Whether the retrieval pipeline surfaces useful context |
+| **Faithfulness (groundedness)** | Whether the answer is grounded in the retrieved context (scores below 0.7 indicate hallucination) |
+| **Answer relevancy** | Whether the answer addresses the question asked |
+| **Context precision** | Whether the retrieved chunks are relevant to the question |
+| **Context relevancy** | Whether the retrieval pipeline surfaces useful context |
+| **Completeness** | Coverage of the expected answer (when ground truth is provided) |
+| **Correctness** | Factual alignment with the expected answer |
+| **Compliance accuracy** | Domain-specific regulatory/compliance alignment (FSI profiles) |
+| **Abstention quality** | Whether the model appropriately declines when context is insufficient |
 
-A separate judge model (Mistral-Small-24B by default) evaluates responses from the candidate models, ensuring independent assessment.
+Deterministic checks (document presence, chunk alignment) and profile-based verdicts (PASS / FAIL / REVIEW) complement judge scores. Configure `JUDGE_MODEL_NAME` to a model distinct from the candidates under test.
 
 ### Tech stack
 

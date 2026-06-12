@@ -52,8 +52,6 @@ venv.bak/
 .coverage
 .pytest_cache/
 .vitest/
-.deepeval/
-
 # Database
 *.db
 *.sqlite

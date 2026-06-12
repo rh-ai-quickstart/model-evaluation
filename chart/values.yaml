@@ -19,7 +19,7 @@ models:
     deploymentMode: "maas"
   # Embedding model for RAG pipeline
   embeddingModel: "nomic-embed-text-v1-5"
-  # Judge model for evaluation metrics (DeepEval) -- must be distinct from A and B
+  # Judge model for LLM-as-judge evaluation scoring -- must be distinct from A and B
   judgeModel: "llama-scout-17b"
 
 # Secrets configuration - override with actual secrets

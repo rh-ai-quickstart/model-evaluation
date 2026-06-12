@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ai-quickstart-template-db"
+name = "model-evaluation-db"
 dynamic = ["version"]
-description = "Database package for ai-quickstart-template"
+description = "Database package for model-evaluation quickstart"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
