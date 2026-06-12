@@ -87,7 +87,7 @@ class Settings(BaseSettings):
 
     @property
     def resolved_judge_model_name(self) -> str:
-        """Model for DeepEval LLM-as-judge: explicit judge, then chat A, then B."""
+        """Model for LLM-as-judge scoring: explicit judge, then chat A, then B."""
         for candidate in (self.JUDGE_MODEL_NAME, self.MODEL_A_NAME, self.MODEL_B_NAME):
             if isinstance(candidate, str) and candidate.strip():
                 return candidate.strip()

@@ -24,8 +24,7 @@ dependencies = [
     "pypdf>=4.0.0",
     "python-multipart>=0.0.9",
     "httpx>=0.25.0",
-    "ai-quickstart-template-db",
-    "deepeval>=3.9.2",
+    "model-evaluation-db",
     "openai",
     "docling>=2.0.0",
     "docling-core>=2.0.0",
@@ -43,8 +42,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/example/ai-quickstart-template"
-Repository = "https://github.com/example/ai-quickstart-template.git"
+Homepage = "https://github.com/rh-ai-quickstart/model-evaluation"
+Repository = "https://github.com/rh-ai-quickstart/model-evaluation.git"
 
 [tool.hatch.version]
 path = "src/__init__.py"
@@ -81,4 +80,4 @@ extra-index-url = ["https://download.pytorch.org/whl/cpu"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-"ai-quickstart-template-db" = { path = "../db", editable = true }
+"model-evaluation-db" = { path = "../db", editable = true }
