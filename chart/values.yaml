@@ -1,7 +1,7 @@
 # Default values for model-evaluation
 global:
   imageRegistry: quay.io
-  imageRepository: rh-ai-quickstart
+  imageRepository: olavtar
   imageTag: latest
   imagePullPolicy: Always
   storageClass: ""
@@ -10,6 +10,8 @@ global:
 models:
   # MaaS endpoint (shared for all models)
   maasEndpoint: "https://litellm-prod.apps.maas.redhatworkshops.io"
+  # LiteLLM admin UI (provides model metadata: pricing, context window, capabilities)
+  litellmAdminUrl: "https://litellm-prod-frontend.apps.maas.redhatworkshops.io"
   # Default models for A/B comparison
   modelA:
     name: "granite-3-2-8b-instruct"
