@@ -65,6 +65,8 @@ spec:
               value: {{ .Values.models.embeddingModel | quote }}
             - name: JUDGE_MODEL_NAME
               value: {{ .Values.models.judgeModel | quote }}
+            - name: LITELLM_ADMIN_URL
+              value: {{ .Values.models.litellmAdminUrl | quote }}
           {{- if .Values.api.healthCheck.enabled }}
           livenessProbe:
             httpGet:

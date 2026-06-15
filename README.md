@@ -229,14 +229,13 @@ oc delete project ${PROJECT}
 ## References
 
 - [Red Hat OpenShift AI Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/)
-- [DeepEval RAG Evaluation Metrics](https://docs.confident-ai.com/docs/metrics-introduction)
 - [AI Quickstart Contributing Guide](https://github.com/rh-ai-quickstart/ai-quickstart-contrib/blob/main/CONTRIBUTING.md)
 
 ## Technical details
 
 ### Evaluation metrics
 
-Metric names follow common RAG evaluation terminology (see [DeepEval metrics](https://docs.confident-ai.com/docs/metrics-introduction) for comparable definitions). Scores are produced by a **consolidated LLM-as-judge** over OpenShift AI MaaS — not the DeepEval SDK at runtime.
+Metric names follow common RAG evaluation terminology. Scores are produced by a **consolidated LLM-as-judge** over OpenShift AI MaaS.
 
 | Metric | What it measures |
 |--------|-----------------|

@@ -9,16 +9,17 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy DB package (API depends on it)
-COPY packages/db/pyproject.toml packages/db/pyproject.toml
-COPY packages/db/src/ packages/db/src/
+COPY packages/db/ packages/db/
 
 # Copy API package files
 COPY packages/api/pyproject.toml packages/api/pyproject.toml
 COPY packages/api/src/ packages/api/src/
 
-# Install dependencies
+# Install dependencies (db package first, then API)
+WORKDIR /app/packages/db
+RUN uv pip install --system . || pip install .
 WORKDIR /app/packages/api
-RUN uv pip install --system -e . 2>/dev/null || pip install -e .
+RUN uv pip install --system . || pip install .
 
 # Stage 2: Runtime
 FROM registry.access.redhat.com/ubi9/python-312:latest
