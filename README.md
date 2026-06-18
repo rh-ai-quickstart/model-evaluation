@@ -36,7 +36,7 @@ The evaluation framework distinguishes between two failure modes that matter in 
 
 ### See it in action
 
-<!-- TODO: Add link to Arcade demo or video walkthrough -->
+<video src="docs/images/modelEval.mp4" controls width="100%"></video>
 
 ### Architecture diagrams
 
