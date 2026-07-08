@@ -2,6 +2,9 @@
 
 Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
 
+> [!IMPORTANT]
+> **AI Transparency Disclaimer:** This application uses large language models (LLMs) to generate responses and evaluate AI model performance. All AI-generated outputs, including chat responses and evaluation metrics, are for informational and demonstration purposes only and do not constitute financial, legal, or regulatory advice. Evaluation results should be validated by qualified professionals before informing production decisions.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -41,6 +44,10 @@ https://github.com/user-attachments/assets/f6924c9b-5e54-4ccb-86e4-ef7fde892683
 ### Architecture diagrams
 
 ![Architecture diagram showing data flow from document upload through RAG pipeline to evaluation dashboard](docs/images/architecture-overview.png)
+
+### Comparison dashboard
+
+![Comparison dashboard showing side-by-side model evaluation results](docs/images/comparison.png)
 
 The FastAPI API orchestrates all workflows in a single pod — there are no separate embedding or worker services. Document ingestion parses and chunks PDFs synchronously, then embeds chunks via OpenShift AI MaaS in a background task. Model evaluation runs as an async background job: hybrid retrieval (pgvector + keyword search), candidate model generation, and LLM-as-judge scoring. The comparison dashboard reads stored evaluation runs from PostgreSQL with no additional LLM calls.
 
