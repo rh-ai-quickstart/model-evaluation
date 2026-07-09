@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, Info } from 'lucide-react';
 
 interface ChatInputProps {
     onSend: (message: string) => void;
@@ -54,9 +54,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                     <SendHorizontal className="h-4 w-4" />
                 </button>
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground">
-                Responses are generated from your uploaded documents. This is not legal or compliance advice.
-            </p>
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>Responses are generated from your uploaded documents and are for informational purposes only. This is not legal or compliance advice.</span>
+            </div>
         </div>
     );
 }
