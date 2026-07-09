@@ -1,6 +1,6 @@
 # Evaluate and Compare Models in Financial Services
 
-Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
+Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on Red Hat® OpenShift® AI with zero GPUs required.
 
 > [!IMPORTANT]
 > **AI Transparency Disclaimer:** This application uses large language models (LLMs) to generate responses and evaluate AI model performance. All AI-generated outputs, including chat responses and evaluation metrics, are for informational and demonstration purposes only and do not constitute financial, legal, or regulatory advice. Evaluation results should be validated by qualified professionals before informing production decisions.
@@ -11,6 +11,7 @@ Compare candidate LLMs for RAG workloads using automated evaluation metrics -- d
 - [Detailed description](#detailed-description)
   - [See it in action](#see-it-in-action)
   - [Architecture diagrams](#architecture-diagrams)
+  - [Comparison dashboard](#comparison-dashboard)
 - [Requirements](#requirements)
   - [Minimum hardware requirements](#minimum-hardware-requirements)
   - [Minimum software requirements](#minimum-software-requirements)
