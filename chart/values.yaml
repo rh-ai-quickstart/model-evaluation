@@ -9,20 +9,20 @@ global:
 # Model serving configuration
 models:
   # MaaS endpoint (shared for all models)
-  maasEndpoint: "https://litellm-prod.apps.maas.redhatworkshops.io"
+  maasEndpoint: "https://maas-rhdp.apps.maas.redhatworkshops.io"
   # LiteLLM admin UI (provides model metadata: pricing, context window, capabilities)
-  litellmAdminUrl: "https://litellm-prod-frontend.apps.maas.redhatworkshops.io"
+  litellmAdminUrl: "https://maas-rhdp-frontend.apps.maas.redhatworkshops.io"
   # Default models for A/B comparison
   modelA:
     name: "granite-3-2-8b-instruct"
     deploymentMode: "maas"
   modelB:
-    name: "deepseek-r1-distill-qwen-14b"
+    name: "llama-scout-17b"
     deploymentMode: "maas"
   # Embedding model for RAG pipeline
   embeddingModel: "nomic-embed-text-v1-5"
   # Judge model for LLM-as-judge evaluation scoring -- must be distinct from A and B
-  judgeModel: "llama-scout-17b"
+  judgeModel: "gpt-oss-120b"
 
 # Secrets configuration - override with actual secrets
 secrets:

@@ -125,10 +125,10 @@ The default configuration uses these models via MaaS:
 
 | Role | Default Model |
 |------|--------------|
-| Model A | Granite-3.3-8B-Instruct |
-| Model B | Llama-4-Scout-17B-16E-W4A16 |
-| Embedding | Nomic-embed-text-v2-moe |
-| Judge | Mistral-Small-24B-W8A8 |
+| Model A | granite-3-2-8b-instruct |
+| Model B | llama-scout-17b |
+| Embedding | nomic-embed-text-v1-5 |
+| Judge | gpt-oss-120b |
 
 To use different models:
 
