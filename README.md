@@ -273,10 +273,10 @@ Once deployed, the API is available at the route path `/api`. Interactive API do
 
 ## Tags
 
-**Title:** Evaluate and Compare Models in Financial Services
-**Description:** Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
-**Industry:** Banking and securities
-**Product:** OpenShift AI
-**Use case:** Productivity
-**Partner:** N/A
-**Contributor org:** Red Hat
+* **Title:** Evaluate and Compare Models in Financial Services
+* **Description:** Compare candidate LLMs for RAG workloads using automated evaluation metrics -- deploy on OpenShift AI with zero GPUs required.
+* **Industry:** Banking and securities
+* **Product:** OpenShift AI
+* **Use case:** Productivity
+* **Partner:** N/A
+* **Contributor org:** Red Hat
