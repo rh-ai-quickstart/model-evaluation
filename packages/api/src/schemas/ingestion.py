@@ -10,7 +10,7 @@ class IngestUrlRequest(BaseModel):
 
 
 class IngestS3Request(BaseModel):
-    """Request to ingest a PDF from S3/MinIO."""
+    """Request to ingest a PDF from S3-compatible storage."""
 
     bucket: str = Field(..., min_length=1)
     key: str = Field(..., min_length=1)

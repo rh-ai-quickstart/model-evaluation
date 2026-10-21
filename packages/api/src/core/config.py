@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Document parsing
     DOCLING_ENABLED: bool = True
 
-    # S3/MinIO ingestion
+    # S3-compatible ingestion
     S3_ENDPOINT_URL: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""

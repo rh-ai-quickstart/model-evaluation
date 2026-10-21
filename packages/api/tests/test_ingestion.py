@@ -120,7 +120,7 @@ async def test_download_s3_returns_content_and_filename():
     mock_s3.get_object.return_value = {"Body": mock_body}
 
     with patch("src.services.ingestion.settings") as mock_settings:
-        mock_settings.S3_ENDPOINT_URL = "https://minio.local:9000"
+        mock_settings.S3_ENDPOINT_URL = "https://s3.example.com"
         mock_settings.S3_ACCESS_KEY = "access"
         mock_settings.S3_SECRET_KEY = "secret"
 

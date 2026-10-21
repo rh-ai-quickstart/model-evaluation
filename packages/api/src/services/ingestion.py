@@ -68,7 +68,7 @@ async def download_from_url(url: str) -> tuple[bytes, str]:
 
 
 async def download_from_s3(bucket: str, key: str) -> tuple[bytes, str]:
-    """Download a PDF from S3/MinIO.
+    """Download a PDF from S3-compatible storage.
 
     Uses settings for S3 configuration (endpoint, credentials).
 
@@ -232,7 +232,7 @@ async def ingest_from_s3(
     session: AsyncSession,
     background_tasks: BackgroundTasks,
 ) -> IngestionResult:
-    """Download a PDF from S3/MinIO and ingest it.
+    """Download a PDF from S3-compatible storage and ingest it.
 
     Args:
         bucket: S3 bucket name.

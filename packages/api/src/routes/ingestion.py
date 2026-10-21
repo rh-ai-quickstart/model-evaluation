@@ -1,4 +1,4 @@
-"""Ingestion endpoints -- ingest documents from URLs and S3/MinIO."""
+"""Ingestion endpoints -- ingest documents from URLs and S3-compatible storage."""
 
 import logging
 
@@ -56,7 +56,7 @@ async def ingest_s3(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
 ) -> IngestResult:
-    """Ingest a PDF document from S3/MinIO.
+    """Ingest a PDF document from S3-compatible storage.
 
     Downloads the PDF from the configured S3-compatible endpoint and
     processes it through the standard pipeline.
